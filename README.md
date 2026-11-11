@@ -75,10 +75,11 @@ clasp deploy -V <version> -d "descripcion"
 
 Copia la nueva URL `/exec` en `docs/config.js` (`window.FRITIK_API`).
 
-## Publicar el frontend
+## Frontend publicado
 
-Crear el repositorio `fritik` en GitHub y publicar la carpeta `docs` con
-GitHub Pages (rama `main`, carpeta `/docs`). La URL prevista es:
+Repositorio: `https://github.com/appmovilesoficial/fritik`
+
+GitHub Pages (rama `main`, carpeta `/docs`):
 
 `https://appmovilesoficial.github.io/fritik`
 
