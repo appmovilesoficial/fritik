@@ -261,8 +261,8 @@ function topbar() {
     ? `<span class="chip sitio">🪑 Mesa ${S.table.number}</span>`
     : (S.user.role === 'cliente' ? '<span class="chip llevar">🛍️ Para llevar</span>' : '');
   return `<div class="topbar">
-    <div class="brand"><img class="brand-logo" src="assets/logo.svg" alt="Fritik"/>
-      <span class="brand-text"><strong>Fritik</strong><small>churros · puro antojo</small></span>
+    <div class="brand"><img class="brand-logo" src="assets/logo-wordmark.png?v=3" alt="Fritik"/>
+      <span class="brand-text"><small>churros · puro antojo</small></span>
     </div>
     <div class="who">
       ${lugar}
@@ -956,9 +956,8 @@ function renderLogin() {
   document.getElementById('app').innerHTML = `
   <div class="login-wrap">
     <div class="card login-card">
-      <img class="login-logo" src="assets/logo.svg" alt="Fritik — churros"/>
-      <h1>Fritik</h1>
-      <p class="login-slogan">puro antojo</p>
+      <img class="login-logo" src="assets/logo.png?v=3" alt="Fritik — puro antojo"/>
+      <h1 class="sr-only">Fritik</h1>
       <p>Churros recién hechos, chocolate caliente y dulces para todos.<br/>Escanea el QR de tu mesa o entra con tu perfil de personal.</p>
       <form id="login-form">
         <div class="field"><label>Usuario</label><input id="lg-user" autocomplete="username" value="" placeholder="ej. mesero"/></div>

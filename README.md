@@ -13,8 +13,10 @@ docs/                     Frontend estático (GitHub Pages)
   styles.css              Tema Fritik: #dfb51d, #462611, fresa #e84a7a
   app.js                  SPA (cliente, vendedor, preparador, cajero, encargado, dueño)
   config.js               URL del backend /exec
-  assets/logo.svg         Logo (marca de churros)
-  assets/banner.svg       Banner de la carta (churros recién hechos)
+  assets/logo.png         Logo real (Fritik · puro · ANTOJO), fondo transparente
+  assets/logo-wordmark.png  Recorte "Fritik" para la barra superior
+  assets/favicon.png      Icono del sitio (monograma F sobre dorado)
+  assets/banner.svg       Banner de la carta (provisional, churros)
   vendor/qrcode-generator.js
 
 apps-script/fritik/       Backend (Google Apps Script)
@@ -56,9 +58,9 @@ chocolates, postres y bebidas (36 productos en total).
 ## Cambiar logo y banner
 
 1. Guarda las imágenes definitivas en `docs/assets/` (por ejemplo
-   `logo.png` y `banner.png`, o reemplaza los `.svg`).
+   `logo.png`, `logo-wordmark.png`, `favicon.png` y el banner).
 2. Si cambias el nombre/extension, actualiza las referencias en
-   `docs/app.js` (`brand-logo`, `login-logo` y `hero`) y el favicon en
+   `docs/app.js` (`brand-logo` y `login-logo`) y el favicon en
    `docs/index.html`.
 3. Sube el cambio y aumenta el `?v=` de `docs/index.html` para saltar la
    caché de GitHub Pages.

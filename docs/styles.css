@@ -46,6 +46,11 @@ h1, h2, h3, .brand-text strong, .section-title, .stat .value,
 
 .loading-screen { display: grid; place-items: center; min-height: 100vh; color: var(--muted); }
 
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+
 button { font-family: inherit; cursor: pointer; border: none; }
 input, select, textarea {
   font-family: inherit; background: #fffdf7; border: 1px solid #d9b978;
@@ -68,11 +73,11 @@ label { font-size: 13px; color: var(--muted); display: block; margin-bottom: 6px
 .brand { display: flex; align-items: center; gap: 10px; }
 .brand .logo { font-size: 26px; filter: drop-shadow(0 2px 6px rgba(232, 74, 122, .35)); }
 .brand-logo {
-  width: 42px; height: 42px; border-radius: 50%; object-fit: cover;
-  background: var(--cream); border: 2px solid #462611;
-  box-shadow: 0 4px 12px rgba(70, 38, 17, .22); flex-shrink: 0;
+  width: auto; height: 44px; object-fit: contain;
+  filter: drop-shadow(0 3px 6px rgba(70, 38, 17, .18));
+  flex-shrink: 0;
 }
-.brand-text { display: flex; flex-direction: column; line-height: 1.02; }
+.brand-text { display: flex; flex-direction: column; justify-content: center; line-height: 1.02; }
 .brand-text strong { font-size: 23px; letter-spacing: .3px; color: var(--text); }
 .brand-text small { font-size: 10px; letter-spacing: 1.8px; text-transform: uppercase; color: var(--accent-2); }
 .topbar .who { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--muted); }
@@ -170,9 +175,8 @@ label { font-size: 13px; color: var(--muted); display: block; margin-bottom: 6px
 }
 .login-card .logo-big { font-size: 58px; filter: drop-shadow(0 6px 18px rgba(232, 74, 122, .3)); }
 .login-logo {
-  display: block; width: 118px; height: 118px; border-radius: 50%;
-  object-fit: cover; margin: 0 auto 8px; background: var(--cream);
-  border: 3px solid var(--text); box-shadow: 0 10px 24px rgba(70, 38, 17, .22);
+  display: block; width: 240px; max-width: 100%; height: auto;
+  margin: 0 auto 12px; filter: drop-shadow(0 8px 20px rgba(70, 38, 17, .18));
 }
 .login-card h1 { font-size: 40px; letter-spacing: .5px; margin: 2px 0 0; color: var(--text); }
 .login-slogan {
@@ -365,7 +369,7 @@ table.data tr:last-child td { border-bottom: none; }
   }
   .brand { gap: 6px; min-width: 0; flex-shrink: 0; }
   .brand .logo { font-size: 22px; }
-  .brand-logo { width: 32px; height: 32px; }
+  .brand-logo { height: 34px; }
   .brand-text strong { font-size: 19px; }
   .brand-text small { display: none; }
 
@@ -499,7 +503,7 @@ table.data tr:last-child td { border-bottom: none; }
   .login-card { padding: 14px 14px 16px; }
   .login-card::before { height: 8px; margin-bottom: 12px; }
   .login-card .logo-big { font-size: 40px; }
-  .login-logo { width: 64px; height: 64px; margin-bottom: 2px; border-width: 2px; }
+  .login-logo { width: 210px; margin-bottom: 8px; }
   .login-card h1 { font-size: 27px; }
   .login-slogan { font-size: 14px !important; margin-bottom: 8px !important; letter-spacing: 2px; }
   .login-card p { margin-bottom: 10px; line-height: 1.38; font-size: 13px; }
@@ -531,7 +535,7 @@ table.data tr:last-child td { border-bottom: none; }
   .login-wrap { padding: 6px; }
   .login-card { padding: 10px 12px 12px; }
   .login-card::before { height: 6px; margin-bottom: 8px; }
-  .login-logo { width: 52px; height: 52px; }
+  .login-logo { width: 180px; }
   .login-card h1 { font-size: 23px; }
   .login-slogan { font-size: 13px !important; margin-bottom: 6px !important; }
   .login-card > p:not(.login-slogan):not(.login-hint):not(.login-tip) { display: none; }
@@ -545,7 +549,7 @@ table.data tr:last-child td { border-bottom: none; }
 /* Pantallas muy estrechas (≤380px) */
 @media (max-width: 380px) {
   .brand-text strong { font-size: 17px; }
-  .brand-logo { width: 28px; height: 28px; }
+  .brand-logo { height: 30px; }
   .topbar .who .btn.small { padding: 6px 8px; }
   .nav button { padding: 8px 12px; font-size: 12.5px; }
   .grid.cols-4 { gap: 8px; }
