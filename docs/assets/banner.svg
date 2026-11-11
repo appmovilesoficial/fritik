@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 560" width="1600" height="560" role="img" aria-label="Fritik — churros recién hechos, puro antojo">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f7d76b"/>
+      <stop offset=".55" stop-color="#dfb51d"/>
+      <stop offset="1" stop-color="#f4c94b"/>
+    </linearGradient>
+    <linearGradient id="churro" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e3a751"/>
+      <stop offset=".5" stop-color="#cf8a32"/>
+      <stop offset="1" stop-color="#b06d1f"/>
+    </linearGradient>
+    <g id="churro-piece">
+      <rect x="-210" y="-26" width="420" height="52" rx="26" fill="url(#churro)" stroke="#8f5417" stroke-width="5"/>
+      <g stroke="#9c5f1d" stroke-width="6" stroke-linecap="round" opacity=".8">
+        <line x1="-174" y1="-15" x2="-174" y2="15"/>
+        <line x1="-144" y1="-17" x2="-144" y2="17"/>
+        <line x1="-114" y1="-15" x2="-114" y2="15"/>
+        <line x1="-84" y1="-17" x2="-84" y2="17"/>
+        <line x1="-54" y1="-15" x2="-54" y2="15"/>
+        <line x1="-24" y1="-17" x2="-24" y2="17"/>
+        <line x1="6" y1="-15" x2="6" y2="15"/>
+        <line x1="36" y1="-17" x2="36" y2="17"/>
+        <line x1="66" y1="-15" x2="66" y2="15"/>
+        <line x1="96" y1="-17" x2="96" y2="17"/>
+        <line x1="126" y1="-15" x2="126" y2="15"/>
+        <line x1="156" y1="-17" x2="156" y2="17"/>
+        <line x1="186" y1="-15" x2="186" y2="15"/>
+      </g>
+      <g fill="#fffaf0" opacity=".95">
+        <circle cx="-188" cy="-6" r="5"/><circle cx="-158" cy="8" r="6"/>
+        <circle cx="-128" cy="-9" r="5"/><circle cx="-98" cy="6" r="6"/>
+        <circle cx="-68" cy="-7" r="5"/><circle cx="-38" cy="9" r="6"/>
+        <circle cx="-8" cy="-8" r="5"/><circle cx="22" cy="7" r="6"/>
+        <circle cx="52" cy="-6" r="5"/><circle cx="82" cy="9" r="6"/>
+        <circle cx="112" cy="-8" r="5"/><circle cx="142" cy="6" r="6"/>
+        <circle cx="172" cy="-5" r="5"/>
+      </g>
+    </g>
+  </defs>
+
+  <rect width="1600" height="560" fill="url(#bg)"/>
+  <circle cx="120" cy="110" r="58" fill="#fffaf0" opacity=".5"/>
+  <circle cx="1480" cy="450" r="82" fill="#fffaf0" opacity=".4"/>
+  <circle cx="1340" cy="100" r="42" fill="#e84a7a" opacity=".5"/>
+  <circle cx="240" cy="470" r="34" fill="#462611" opacity=".16"/>
+  <g fill="#fffaf0" opacity=".65">
+    <circle cx="430" cy="120" r="11"/>
+    <circle cx="470" cy="158" r="7"/>
+    <circle cx="1120" cy="420" r="10"/>
+    <circle cx="1170" cy="455" r="14"/>
+    <circle cx="390" cy="450" r="9"/>
+  </g>
+
+  <!-- Churros de la izquierda -->
+  <g>
+    <use href="#churro-piece" transform="translate(250 250) rotate(-30)"/>
+    <use href="#churro-piece" transform="translate(235 340) rotate(-18)"/>
+    <use href="#churro-piece" transform="translate(255 430) rotate(-8)"/>
+  </g>
+
+  <!-- Taza de chocolate con churro -->
+  <g transform="translate(1355 360)">
+    <use href="#churro-piece" transform="translate(-10 -150) rotate(62) scale(.55)"/>
+    <use href="#churro-piece" transform="translate(28 -135) rotate(48) scale(.55)"/>
+    <path d="M-112 -6 h224 l-20 152 a42 42 0 0 1 -42 36 h-100 a42 42 0 0 1 -42 -36 z"
+          fill="#fffaf0" stroke="#462611" stroke-width="9"/>
+    <ellipse cx="0" cy="-6" rx="112" ry="32" fill="#5c3118" stroke="#462611" stroke-width="9"/>
+    <ellipse cx="0" cy="-8" rx="88" ry="21" fill="#8a4a22"/>
+    <path d="M112 34 q48 6 40 40 q-6 26 -40 30" fill="none" stroke="#462611" stroke-width="9" stroke-linecap="round"/>
+    <text x="0" y="118" text-anchor="middle" font-family="Georgia, serif" font-size="34" font-weight="bold" fill="#e84a7a">chocolate</text>
+  </g>
+
+  <!-- Marca -->
+  <text x="800" y="276" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif"
+        font-size="196" font-weight="800" fill="#462611" letter-spacing="4">Fritik</text>
+  <text x="800" y="366" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif"
+        font-size="50" font-weight="700" fill="#462611" letter-spacing="2">churros recién hechos</text>
+  <text x="800" y="455" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif"
+        font-size="66" font-weight="700" fill="#e84a7a" letter-spacing="9">puro antojo</text>
+</svg>

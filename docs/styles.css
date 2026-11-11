@@ -1,0 +1,559 @@
+/* ============================================================
+   Fritik — dulcería · puro antojo
+   Paleta: caramelo (#dfb51d) · chocolate (#462611) · fresa (#e84a7a)
+   ============================================================ */
+:root {
+  --bg: #dfb51d;
+  --bg-2: #fff7e2;
+  --bg-3: #f7e7bd;
+  --card: #fffaf0;
+  --card-2: #fff3d4;
+  --border: #e0bb61;
+  --text: #462611;
+  --muted: #7a5730;
+  --accent: #e84a7a;
+  --accent-2: #b3284f;
+  --green: #2f8f5b;
+  --red: #cf3a3a;
+  --blue: #2f6fae;
+  --purple: #8a4fbf;
+  --cyan: #0e7c6a;
+  --cream: #fffaf0;
+  --radius: 18px;
+  --shadow: 0 12px 30px rgba(70, 38, 17, .16);
+  --serape: repeating-linear-gradient(90deg,
+      var(--accent) 0 22px, #f4a300 22px 44px,
+      var(--green) 44px 66px, #462611 66px 88px);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: "Nunito", "Segoe UI", system-ui, -apple-system, sans-serif;
+  background:
+    radial-gradient(900px 500px at 85% -15%, #f7d76b 0%, transparent 60%),
+    radial-gradient(700px 420px at 0% 100%, #c99a12 0%, transparent 65%),
+    var(--bg);
+  background-attachment: fixed;
+  color: var(--text);
+  min-height: 100vh;
+}
+
+h1, h2, h3, .brand-text strong, .section-title, .stat .value,
+.login-card h1, .table-card .num, .cart-total {
+  font-family: "Baloo 2", "Trebuchet MS", Georgia, serif;
+}
+
+.loading-screen { display: grid; place-items: center; min-height: 100vh; color: var(--muted); }
+
+button { font-family: inherit; cursor: pointer; border: none; }
+input, select, textarea {
+  font-family: inherit; background: #fffdf7; border: 1px solid #d9b978;
+  color: var(--text); border-radius: 10px; padding: 10px 12px; font-size: 15px; width: 100%;
+}
+input::placeholder, textarea::placeholder { color: #a98a5e; }
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); border-color: transparent; }
+label { font-size: 13px; color: var(--muted); display: block; margin-bottom: 6px; }
+
+/* ---------- Layout ---------- */
+.shell { max-width: 1150px; margin: 0 auto; padding: 0 16px 70px; }
+
+.topbar {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 12px 0; position: sticky; top: 0; z-index: 30;
+  background: rgba(255, 250, 240, .94); backdrop-filter: blur(10px);
+  border-bottom: 3px solid transparent; margin-bottom: 18px;
+  border-image: var(--serape) 30;
+}
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand .logo { font-size: 26px; filter: drop-shadow(0 2px 6px rgba(232, 74, 122, .35)); }
+.brand-logo {
+  width: 42px; height: 42px; border-radius: 50%; object-fit: cover;
+  background: var(--cream); border: 2px solid #462611;
+  box-shadow: 0 4px 12px rgba(70, 38, 17, .22); flex-shrink: 0;
+}
+.brand-text { display: flex; flex-direction: column; line-height: 1.02; }
+.brand-text strong { font-size: 23px; letter-spacing: .3px; color: var(--text); }
+.brand-text small { font-size: 10px; letter-spacing: 1.8px; text-transform: uppercase; color: var(--accent-2); }
+.topbar .who { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--muted); }
+
+.badge {
+  padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 800;
+  text-transform: uppercase; letter-spacing: .5px;
+}
+.badge.cliente { background: #f9d3dd; color: #7a1233; }
+.badge.mesero { background: #d8e9ff; color: #1c4f82; }
+.badge.cocinero { background: #ffe6c2; color: #8a4a00; }
+.badge.cajero { background: #d9f3d4; color: #1e5e2a; }
+.badge.encargado { background: #ecd9ff; color: #5b2a8a; }
+.badge.dueno { background: #ffd9d4; color: #8a1b1b; }
+
+.nav { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; }
+.nav button {
+  background: var(--bg-2); color: var(--muted); border: 1px solid var(--border);
+  padding: 9px 16px; border-radius: 999px; font-size: 14px; font-weight: 700;
+  transition: background .15s, color .15s, border-color .15s;
+}
+.nav button:hover { border-color: var(--accent); color: var(--text); }
+.nav button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+.grid { display: grid; gap: 14px; }
+.grid.cols-2 { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+.grid.cols-3 { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+.grid.cols-4 { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+
+.card {
+  background: linear-gradient(180deg, var(--card), var(--card-2));
+  border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow);
+}
+.card h3 { font-size: 17px; margin-bottom: 8px; }
+.section-title {
+  font-size: 22px; font-weight: 800; margin: 22px 0 12px;
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+}
+.section-title::before {
+  content: ''; width: 6px; height: 20px; border-radius: 4px;
+  background: var(--serape); background-size: 88px 20px;
+  display: inline-block; margin-right: -4px;
+}
+.muted { color: var(--muted); font-size: 14px; }
+
+/* ---------- Hero / banner ---------- */
+.hero { margin: 0 0 16px; }
+.hero img {
+  display: block; width: 100%; max-height: 320px; object-fit: cover;
+  border-radius: var(--radius); border: 3px solid var(--text);
+  box-shadow: var(--shadow);
+}
+
+/* ---------- Especialidad: churros ---------- */
+.specialty-strip {
+  text-align: center;
+  background: linear-gradient(90deg, rgba(232, 74, 122, .16), rgba(244, 163, 0, .2));
+  border: 1px dashed var(--accent); border-radius: 999px;
+  padding: 10px 16px; margin: 0 0 14px;
+  font-size: 14px; font-weight: 700; color: var(--text); line-height: 1.35;
+}
+.specialty-strip strong { color: var(--accent-2); }
+.star-tag {
+  display: inline-block; vertical-align: middle; margin-left: 6px;
+  background: var(--accent); color: #fff; font-size: 10px; font-weight: 800;
+  text-transform: uppercase; letter-spacing: .4px; padding: 2px 7px; border-radius: 999px;
+}
+
+/* ---------- Botones ---------- */
+.btn {
+  background: var(--accent); color: #fff; font-weight: 800;
+  padding: 11px 18px; border-radius: 12px; font-size: 15px;
+  box-shadow: 0 4px 0 rgba(140, 20, 55, .35);
+  transition: transform .06s ease, filter .15s;
+}
+.btn:hover { filter: brightness(1.07); }
+.btn:active { transform: translateY(1px) scale(.99); box-shadow: 0 2px 0 rgba(140, 20, 55, .35); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn.secondary { background: var(--bg-2); color: var(--text); border: 1px solid var(--border); box-shadow: none; }
+.btn.green { background: var(--green); color: #fff; box-shadow: 0 4px 0 rgba(20, 70, 40, .3); }
+.btn.red { background: var(--red); color: #fff; box-shadow: 0 4px 0 rgba(110, 20, 20, .3); }
+.btn.blue { background: var(--blue); color: #fff; box-shadow: 0 4px 0 rgba(15, 50, 90, .3); }
+.btn.small { padding: 7px 12px; font-size: 13px; border-radius: 9px; }
+.btn.block { width: 100%; }
+.btn.ghost { background: transparent; border: 1px dashed var(--border); color: var(--muted); box-shadow: none; }
+
+/* ---------- Login ---------- */
+.login-wrap { min-height: 100vh; display: grid; place-items: center; padding: 20px; }
+.login-card { width: 100%; max-width: 430px; text-align: center; padding: 30px 26px 26px; }
+.login-card::before {
+  content: ''; display: block; height: 10px; border-radius: 999px;
+  margin: 0 0 22px; background: var(--serape);
+  box-shadow: 0 6px 18px rgba(232, 74, 122, .28);
+}
+.login-card .logo-big { font-size: 58px; filter: drop-shadow(0 6px 18px rgba(232, 74, 122, .3)); }
+.login-logo {
+  display: block; width: 118px; height: 118px; border-radius: 50%;
+  object-fit: cover; margin: 0 auto 8px; background: var(--cream);
+  border: 3px solid var(--text); box-shadow: 0 10px 24px rgba(70, 38, 17, .22);
+}
+.login-card h1 { font-size: 40px; letter-spacing: .5px; margin: 2px 0 0; color: var(--text); }
+.login-slogan {
+  font-family: "Baloo 2", "Trebuchet MS", Georgia, serif;
+  color: var(--accent-2) !important; font-size: 19px !important;
+  font-weight: 700; letter-spacing: 2.4px; text-transform: lowercase;
+  margin: 0 0 12px !important;
+}
+.login-card p { color: var(--muted); font-size: 14px; margin-bottom: 20px; line-height: 1.45; }
+.login-hint { margin-top: 18px; }
+.login-tip { margin-top: 14px !important; font-size: 12px !important; }
+.field { text-align: left; margin-bottom: 14px; }
+.quick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 16px; }
+.quick button {
+  background: var(--bg-2); border: 1px solid var(--border); color: var(--text);
+  padding: 10px 6px; border-radius: 11px; font-size: 12px; font-weight: 700;
+}
+.quick button:hover { border-color: var(--accent); background: var(--bg-3); }
+.quick .q-emoji { display: block; font-size: 20px; margin-bottom: 4px; }
+
+/* ---------- Menú cliente ---------- */
+.cat-tabs { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 14px; }
+.cat-tabs button {
+  white-space: nowrap; background: var(--bg-2); border: 1px solid var(--border);
+  color: var(--muted); padding: 8px 15px; border-radius: 999px; font-size: 13px; font-weight: 800;
+}
+.cat-tabs button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+.dish { display: flex; gap: 14px; align-items: center; transition: transform .12s, border-color .15s; }
+.dish:hover { transform: translateY(-2px); border-color: var(--accent); }
+.dish .emoji {
+  font-size: 34px; width: 58px; height: 58px; display: grid; place-items: center;
+  border-radius: 14px; background: rgba(232, 74, 122, .14); flex-shrink: 0;
+}
+.dish .info { flex: 1; }
+.dish .info .name { font-weight: 800; font-size: 15.5px; }
+.dish .info .desc { font-size: 13px; color: var(--muted); margin-top: 2px; line-height: 1.35; }
+.dish .price { font-weight: 800; color: var(--accent-2); white-space: nowrap; }
+.dish-add { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; }
+.qty-ctrl { display: flex; align-items: center; gap: 8px; }
+.qty-ctrl button {
+  width: 32px; height: 32px; border-radius: 10px; background: var(--bg-3);
+  color: var(--text); font-size: 17px; font-weight: 800; border: 1px solid var(--border);
+}
+.qty-ctrl button:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+.qty-ctrl span { min-width: 22px; text-align: center; font-weight: 800; }
+
+/* ---------- Precio doble: divisa arriba, Bs. abajo (letra pequeña) ---------- */
+.dual { display: inline-flex; flex-direction: column; line-height: 1.12; vertical-align: middle; }
+.dual .price-eur { display: block; font-weight: 800; white-space: nowrap; }
+.dual .price-ves {
+  display: block; font-weight: 600; white-space: nowrap;
+  font-size: min(.72em, 13px);
+  color: var(--muted); margin-top: 1px;
+}
+.cart-total .dual { align-items: flex-end; }
+.stat .value .price-eur { display: inline; }
+.btn .price-ves { opacity: .85; }
+.chip .dual { align-items: center; }
+
+/* ---------- Tasa BCV del día ---------- */
+.rate-bar {
+  font-size: 11px; color: var(--muted); text-align: right;
+  margin: -8px 0 14px; letter-spacing: .2px;
+}
+
+/* ---------- Carrito ---------- */
+.cart-fab {
+  position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+  z-index: 40; box-shadow: 0 12px 32px rgba(232, 74, 122, .45);
+  display: flex; align-items: center; gap: 10px; white-space: nowrap;
+  max-width: calc(100vw - 32px); overflow: hidden; text-overflow: ellipsis;
+}
+.cart-line { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+.cart-line:last-child { border-bottom: none; }
+.cart-total { display: flex; justify-content: space-between; font-size: 22px; font-weight: 800; margin-top: 12px; color: var(--accent-2); }
+
+/* ---------- Selector en el local / para llevar ---------- */
+.seg { display: flex; gap: 8px; }
+.seg-opt {
+  flex: 1; background: var(--bg-2); border: 1px solid var(--border); color: var(--muted);
+  padding: 11px 8px; border-radius: 12px; font-weight: 800; font-size: 13.5px;
+  transition: background .15s, color .15s;
+}
+.seg-opt:hover:not(:disabled) { border-color: var(--accent); color: var(--text); }
+.seg-opt.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.seg-opt:disabled { opacity: .40; cursor: not-allowed; }
+
+/* ---------- Estados / chips ---------- */
+.chip { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 800; }
+.chip.nuevo { background: #d8e7ff; color: #1c4f82; }
+.chip.preparando { background: #ffe5b8; color: #8a4a00; }
+.chip.listo { background: #d9f3d4; color: #1e5e2a; }
+.chip.servido { background: #ecd9ff; color: #5b2a8a; }
+.chip.por_pagar { background: #fff0b8; color: #7a5600; }
+.chip.pagado { background: #d9f3d4; color: #1e5e2a; }
+.chip.cancelado { background: #ffd9d4; color: #8a1b1b; }
+.chip.libre { background: #d9f3d4; color: #1e5e2a; }
+.chip.ocupada { background: #ffd9d4; color: #8a1b1b; }
+.chip.llevar { background: var(--accent); color: #fff; }
+.chip.sitio { background: #e2f2cf; color: #33591f; }
+
+/* ---------- Mesas ---------- */
+.table-card { text-align: center; position: relative; }
+.table-card .num { font-size: 38px; font-weight: 800; color: var(--text); }
+.table-card .seats { font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+.table-card .pend { font-size: 13px; color: var(--accent-2); font-weight: 800; margin-top: 4px; }
+
+/* ---------- Preparación (kanban) ---------- */
+.kanban { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 14px; align-items: start; }
+.kanban-col { background: rgba(255, 250, 240, .55); border: 1px dashed var(--border); border-radius: var(--radius); padding: 12px; }
+.kanban-col h3 { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; font-size: 16px; }
+.kanban-col h3 .count { background: var(--bg-3); border-radius: 999px; padding: 2px 9px; font-size: 12px; }
+
+.ticket { background: var(--card-2); border: 1px solid var(--border); border-radius: 12px; padding: 12px; margin-bottom: 10px; }
+.ticket .head { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+.ticket ul { list-style: none; }
+.ticket li { padding: 4px 0; font-size: 15px; display: flex; gap: 8px; }
+.ticket li .q { color: var(--accent-2); font-weight: 800; }
+.ticket .notes { font-size: 12px; color: var(--cyan); font-style: italic; }
+.ticket .actions { display: flex; gap: 8px; margin-top: 10px; }
+
+/* ---------- Stats ---------- */
+.stat { text-align: center; padding: 18px 10px; }
+.stat .value { font-size: 28px; font-weight: 800; color: var(--accent-2); }
+.stat .label { font-size: 13px; color: var(--muted); margin-top: 4px; }
+
+/* ---------- Tablas de datos ---------- */
+table.data { width: 100%; border-collapse: collapse; font-size: 14px; }
+table.data th, table.data td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--border); }
+table.data th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .5px; }
+table.data tr:last-child td { border-bottom: none; }
+
+/* ---------- QR ---------- */
+.qr-card { text-align: center; }
+.qr-card svg { width: 100%; max-width: 220px; height: auto; background: #fff; border-radius: 12px; padding: 8px; }
+.qr-card .url { font-size: 11px; color: var(--muted); word-break: break-all; margin-top: 8px; }
+
+/* ---------- Modal ---------- */
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(70, 38, 17, .55); z-index: 60;
+  display: grid; place-items: center; padding: 16px; backdrop-filter: blur(4px);
+}
+.modal { width: 100%; max-width: 480px; max-height: 90vh; overflow-y: auto; }
+.modal.wide { max-width: 720px; }
+.modal h2 { font-size: 21px; margin-bottom: 14px; }
+.modal .actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
+
+/* ---------- Toasts ---------- */
+#toast-container { position: fixed; top: 16px; right: 16px; z-index: 90; display: flex; flex-direction: column; gap: 8px; }
+.toast {
+  background: var(--card); border: 1px solid var(--border); color: var(--text);
+  padding: 12px 16px; border-radius: 11px; font-size: 14px; box-shadow: var(--shadow);
+  animation: slideIn .25s ease; max-width: 320px;
+}
+.toast.ok { border-color: var(--green); }
+.toast.err { border-color: var(--red); }
+@keyframes slideIn { from { transform: translateX(30px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* ---------- Varios ---------- */
+.empty { text-align: center; color: var(--muted); padding: 34px 10px; font-size: 14px; }
+.empty .big { font-size: 40px; display: block; margin-bottom: 8px; }
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.spacer { flex: 1; }
+.notif-bar { border-left: 4px solid var(--accent); }
+.pill-waiter { animation: pulse 1.4s infinite; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
+
+/* ============================================================
+   Móvil (≤700px): más contenido visible, menos scroll
+   y controles táctiles cómodos en pantallas de teléfono
+   ============================================================ */
+@media (max-width: 700px) {
+  :root { --radius: 14px; }
+
+  body {
+    min-height: 100vh;
+    min-height: 100dvh;
+    background-attachment: scroll; /* evita repintados costosos en iOS */
+    -webkit-text-size-adjust: 100%;
+  }
+
+  /* Deja espacio para el carrito fijo y el área segura del teléfono */
+  .shell { padding: 0 12px calc(86px + env(safe-area-inset-bottom)); }
+
+  /* ---------- Barra superior: una sola fila compacta ---------- */
+  .topbar {
+    flex-direction: row; flex-wrap: nowrap; align-items: center;
+    gap: 8px; padding: 8px 0; margin-bottom: 8px;
+  }
+  .brand { gap: 6px; min-width: 0; flex-shrink: 0; }
+  .brand .logo { font-size: 22px; }
+  .brand-logo { width: 32px; height: 32px; }
+  .brand-text strong { font-size: 19px; }
+  .brand-text small { display: none; }
+
+  .topbar .who {
+    gap: 6px; margin-left: auto; min-width: 0;
+    font-size: 12px; flex-wrap: nowrap; overflow: hidden;
+  }
+  .topbar .who > span:not(.chip):not(.badge) { display: none; } /* oculta el nombre largo */
+  .topbar .who .chip { padding: 2px 8px; font-size: 11px; white-space: nowrap; }
+  .topbar .who .badge { padding: 3px 7px; font-size: 10px; letter-spacing: .3px; }
+  .topbar .who .btn.small { padding: 7px 10px; font-size: 12px; white-space: nowrap; }
+
+  /* ---------- Tasa BCV en una línea ---------- */
+  .rate-bar {
+    text-align: center; margin: -4px 0 8px; font-size: 10.5px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  /* ---------- Navegación: una fila con scroll horizontal ---------- */
+  .nav {
+    flex-wrap: nowrap; gap: 6px; margin: 0 -12px 12px;
+    padding: 2px 12px 8px;
+    overflow-x: auto; overflow-y: hidden;
+    scrollbar-width: none; -ms-overflow-style: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .nav::-webkit-scrollbar { display: none; }
+  .nav button {
+    flex: 0 0 auto; min-height: 40px; padding: 9px 14px;
+    font-size: 13px; touch-action: manipulation;
+  }
+
+  /* ---------- Secciones, tarjetas y grillas ---------- */
+  .section-title { font-size: 17px; margin: 16px 0 10px; }
+  .section-title::before { width: 5px; height: 17px; }
+  .card { padding: 12px; }
+  .grid { gap: 10px; }
+  .grid.cols-2, .grid.cols-3 { grid-template-columns: 1fr; }
+  .grid.cols-4 { grid-template-columns: repeat(2, 1fr); }
+  .muted { font-size: 13px; }
+
+  /* ---------- Banner ---------- */
+  .hero { margin-bottom: 10px; }
+  .hero img { max-height: 168px; border-width: 2px; }
+  .specialty-strip { font-size: 12px; padding: 8px 10px; margin-bottom: 10px; border-radius: 14px; }
+  .star-tag { font-size: 9px; padding: 2px 6px; }
+
+  /* ---------- Categorías ---------- */
+  .cat-tabs {
+    gap: 6px; margin-bottom: 10px;
+    scrollbar-width: none; -ms-overflow-style: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .cat-tabs::-webkit-scrollbar { display: none; }
+  .cat-tabs button { min-height: 38px; padding: 8px 13px; font-size: 12.5px; }
+
+  /* ---------- Productos: tarjetas más densas ---------- */
+  .dish { gap: 10px; align-items: flex-start; }
+  .dish:hover { transform: none; }
+  .dish .emoji { width: 46px; height: 46px; font-size: 26px; border-radius: 12px; }
+  .dish .info .name { font-size: 14.5px; line-height: 1.25; }
+  .dish .info .desc {
+    font-size: 12px; margin-top: 3px;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .dish-add { margin-top: 8px; gap: 6px; }
+  .dish .price { font-size: 14px; }
+  .qty-ctrl { gap: 4px; }
+  .qty-ctrl button { width: 40px; height: 40px; font-size: 18px; touch-action: manipulation; }
+  .qty-ctrl span { min-width: 20px; }
+
+  /* ---------- Mesas ---------- */
+  .table-card .num { font-size: 30px; }
+  .table-card .seats { margin-bottom: 6px; font-size: 12px; }
+
+  /* ---------- Carrito fijo: todo el ancho y sobre el área segura ---------- */
+  .cart-fab {
+    left: 10px; right: 10px; bottom: calc(10px + env(safe-area-inset-bottom));
+    transform: none; max-width: none; width: auto;
+    justify-content: center; gap: 8px;
+    padding: 12px 14px; font-size: 14px; border-radius: 13px;
+  }
+
+  /* ---------- Modales tipo hoja inferior ---------- */
+  body:has(.modal-backdrop) { overflow: hidden; }
+  .modal-backdrop { place-items: end stretch; padding: 0; }
+  .modal {
+    width: 100%; max-width: none;
+    max-height: 92vh; max-height: 92dvh;
+    border-radius: 20px 20px 0 0;
+    padding: 18px 14px calc(14px + env(safe-area-inset-bottom));
+    animation: sheetUp .22s ease-out;
+  }
+  .modal h2 { font-size: 18px; margin-bottom: 10px; }
+  .modal .actions {
+    position: sticky; bottom: 0; z-index: 2;
+    margin: 14px -14px 0;
+    padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
+    background: var(--card); border-top: 1px solid var(--border);
+    justify-content: stretch; flex-wrap: wrap;
+  }
+  .modal .actions .btn { flex: 1 1 120px; }
+  .modal .cart-line { gap: 8px; font-size: 13px; }
+  @keyframes sheetUp {
+    from { transform: translateY(24px); opacity: .6; }
+    to { transform: none; opacity: 1; }
+  }
+
+  /* ---------- Formularios: 16px evita el zoom automático de iOS ---------- */
+  input, select, textarea { padding: 11px 12px; font-size: 16px; }
+
+  /* ---------- Tablas de datos con scroll horizontal ---------- */
+  .card:has(table.data) { overflow-x: auto; -webkit-overflow-scrolling: touch; padding: 8px; }
+  table.data { min-width: 600px; font-size: 13px; }
+  table.data th, table.data td { padding: 9px 7px; }
+
+  /* ---------- QR ---------- */
+  .qr-card svg { max-width: 150px; }
+  .qr-card .url { font-size: 10px; }
+
+  /* ---------- Avisos flotantes a todo el ancho ---------- */
+  #toast-container {
+    top: auto; left: 10px; right: 10px;
+    bottom: calc(10px + env(safe-area-inset-bottom));
+  }
+  .toast { max-width: none; font-size: 13px; padding: 11px 13px; }
+
+  /* ---------- Login (compacto: cabe en 844 px de alto) ---------- */
+  .login-wrap { min-height: 100vh; min-height: 100dvh; padding: 10px; }
+  .login-card { padding: 14px 14px 16px; }
+  .login-card::before { height: 8px; margin-bottom: 12px; }
+  .login-card .logo-big { font-size: 40px; }
+  .login-logo { width: 64px; height: 64px; margin-bottom: 2px; border-width: 2px; }
+  .login-card h1 { font-size: 27px; }
+  .login-slogan { font-size: 14px !important; margin-bottom: 8px !important; letter-spacing: 2px; }
+  .login-card p { margin-bottom: 10px; line-height: 1.38; font-size: 13px; }
+  .login-hint { margin-top: 10px; }
+  .login-tip { margin-top: 8px !important; font-size: 11.5px !important; }
+  .field { margin-bottom: 10px; }
+  .field label { margin-bottom: 4px; }
+  .quick { gap: 6px; margin-top: 10px; }
+  .quick button { min-height: 44px; padding: 6px 4px; touch-action: manipulation; }
+  .quick .q-emoji { font-size: 17px; margin-bottom: 1px; }
+
+  /* ---------- Preparación ---------- */
+  .kanban { grid-template-columns: 1fr; gap: 10px; }
+  .kanban-col { padding: 10px; }
+  .ticket { padding: 10px; }
+  .ticket li { font-size: 14px; }
+
+  /* ---------- Estadísticas ---------- */
+  .stat { padding: 14px 10px; }
+  .stat .value { font-size: 22px; }
+
+  /* ---------- Toque cómodo ---------- */
+  .btn { min-height: 42px; touch-action: manipulation; }
+  .btn.small { min-height: 36px; }
+}
+
+/* Teléfonos bajitos (≤720px de alto): login sin scroll */
+@media (max-width: 700px) and (max-height: 720px) {
+  .login-wrap { padding: 6px; }
+  .login-card { padding: 10px 12px 12px; }
+  .login-card::before { height: 6px; margin-bottom: 8px; }
+  .login-logo { width: 52px; height: 52px; }
+  .login-card h1 { font-size: 23px; }
+  .login-slogan { font-size: 13px !important; margin-bottom: 6px !important; }
+  .login-card > p:not(.login-slogan):not(.login-hint):not(.login-tip) { display: none; }
+  .login-hint { margin-top: 8px; }
+  .login-tip { display: none; }
+  .field { margin-bottom: 8px; }
+  .quick { margin-top: 8px; }
+  .quick button { min-height: 38px; }
+}
+
+/* Pantallas muy estrechas (≤380px) */
+@media (max-width: 380px) {
+  .brand-text strong { font-size: 17px; }
+  .brand-logo { width: 28px; height: 28px; }
+  .topbar .who .btn.small { padding: 6px 8px; }
+  .nav button { padding: 8px 12px; font-size: 12.5px; }
+  .grid.cols-4 { gap: 8px; }
+  .table-card { padding: 10px; }
+  .table-card .num { font-size: 26px; }
+}
+
+/* Teléfonos extra estrechos (≤340px): libera el logo */
+@media (max-width: 340px) {
+  .brand .logo, .brand-logo { display: none; }
+}
