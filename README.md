@@ -49,6 +49,14 @@ apps-script/fritik/       Backend (Google Apps Script)
 Los clientes no inician sesión: escanean el QR de su mesa o piden para llevar
 desde la carta.
 
+El perfil **encargado** puede operar todas las áreas: ventas y mesas,
+preparación (cocina), cobros y caja, menú, llamados y resumen. Los accesos
+rápidos de prueba ya no se muestran en la pantalla de login.
+
+Los precios se muestran en dólares (**$**) y su equivalente en bolívares con
+la **tasa oficial del dólar del BCV**, consultada desde
+`ve.dolarapi.com/v1/dolares/oficial`.
+
 ## Carta
 
 La especialidad abre la carta: **Churros** (10 productos, marcados como

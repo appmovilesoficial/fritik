@@ -19,7 +19,7 @@ var _dirty = false;
 
 var ROLE_RANK = { cliente: 1, mesero: 2, cocinero: 2, cajero: 3, encargado: 4, dueno: 5 };
 
-// Carta de Fritik: [categoria, nombre, precio (EUR), emoji, descripcion]
+// Carta de Fritik: [categoria, nombre, precio (USD), emoji, descripcion]
 var MENUS = [
   // La especialidad de la casa: churros recién hechos.
   ['Churros', 'Churros clásicos (6 uds)', 3.5, '🥨', 'Recién hechos, con azúcar y canela'],

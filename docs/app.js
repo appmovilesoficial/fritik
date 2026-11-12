@@ -18,23 +18,23 @@ const S = {
   lastHtml: null,
 };
 
-/* ---------------- Moneda: € (principal) + Bs. con tasa BCV ---------------- */
-let RATE = null; // { tasa, fechaValor, fechaValorLegible, regla } desde /api/rates/euro
-const eurFmt = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' });
+/* ---------------- Moneda: $ (principal) + Bs. con tasa oficial del BCV ---------------- */
+let RATE = null; // { tasa, fechaValor, fechaValorLegible, regla } desde ve.dolarapi.com (dólar oficial)
+const usdFmt = new Intl.NumberFormat('es-VE', { style: 'currency', currency: 'USD', currencyDisplay: 'narrowSymbol' });
 const vesFmt = new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-const money = n => eurFmt.format(Number(n) || 0); // solo € (atributos, opciones, tooltips)
+const money = n => usdFmt.format(Number(n) || 0); // solo $ (atributos, opciones, tooltips)
 const bs = n => (RATE && RATE.tasa
   ? 'Bs. ' + vesFmt.format((Number(n) || 0) * RATE.tasa)
   : 'Bs. —');
-// Bloque de precio: euros arriba (grande) y bolívares abajo (letra pequeña)
-const price = n => `<span class="dual"><span class="price-eur">${money(n)}</span><span class="price-ves">${bs(n)}</span></span>`;
+// Bloque de precio: dólares arriba (grande) y bolívares abajo (letra pequeña)
+const price = n => `<span class="dual"><span class="price-usd">${money(n)}</span><span class="price-ves">${bs(n)}</span></span>`;
 
 function rateBar() {
   if (!RATE || !RATE.tasa) return '';
   const tasa = new Intl.NumberFormat('es-VE', { maximumFractionDigits: 2 }).format(RATE.tasa);
-  return `<div class="rate-bar" title="Tasa del euro del Banco Central de Venezuela (BCV) aplicable hoy">
-    💱 1 € = Bs. ${tasa} · Tasa BCV${RATE.fechaValorLegible ? ' · fecha valor: ' + RATE.fechaValorLegible : ''}${RATE.regla ? ' · ' + RATE.regla : ''}</div>`;
+  return `<div class="rate-bar" title="Tasa oficial del dólar del Banco Central de Venezuela (BCV) aplicable hoy">
+    💱 1 $ = Bs. ${tasa} · Tasa BCV${RATE.fechaValorLegible ? ' · fecha valor: ' + RATE.fechaValorLegible : ''}${RATE.regla ? ' · ' + RATE.regla : ''}</div>`;
 }
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const STATUS_LABEL = {
@@ -220,7 +220,16 @@ const TABS = {
   mesero: [['mesas', '🪑 Mesas'], ['pedidos', '🧾 Pedidos'], ['llamados', '🔔 Llamados']],
   cocinero: [['cocina', '🍭 Preparación']],
   cajero: [['cobrar', '💰 Por cobrar'], ['cobrados', '✅ Cobrados']],
-  encargado: [['resumen', '📊 Resumen'], ['pedidos', '🧾 Pedidos'], ['menu', '📖 Menú'], ['mesas', '🪑 Mesas y QR'], ['llamados', '🔔 Llamados']],
+  encargado: [
+    ['resumen', '📊 Resumen'],
+    ['mesas', '🪑 Mesas y QR'],
+    ['pedidos', '🧾 Pedidos'],
+    ['cocina', '🍭 Preparación'],
+    ['cobrar', '💰 Por cobrar'],
+    ['cobrados', '✅ Cobrados'],
+    ['menu', '📖 Menú'],
+    ['llamados', '🔔 Llamados'],
+  ],
   dueno: [['dashboard', '📊 Dashboard'], ['reportes', '📈 Reportes'], ['pedidos', '🧾 Pedidos'], ['menu', '📖 Menú'], ['mesas', '🪑 Mesas y QR'], ['personal', '👥 Personal']],
 };
 const defaultTab = role => (TABS[role] || TABS.cliente)[0][0];
@@ -715,7 +724,9 @@ function payModal(orderId) {
 /* ---------------- ENCARGADO ---------------- */
 function encargadoView(tab, data) {
   if (tab === 'resumen') return resumenView(data.summary, false);
-  if (tab === 'pedidos') return pedidosView(data.orders, false);
+  if (tab === 'pedidos') return pedidosView(data.orders, true);
+  if (tab === 'cocina') return cocineroView(data);
+  if (tab === 'cobrar' || tab === 'cobrados') return cajeroView(tab, data);
   if (tab === 'menu') return menuAdminView(data.menu, false);
   if (tab === 'mesas') return mesasQrView(data.tables, data.orders);
   if (tab === 'llamados') return llamadosView(data.notifs);
@@ -949,10 +960,6 @@ function llamadosView(notifs) {
    LOGIN
    ============================================================ */
 function renderLogin() {
-  const quick = [
-    ['dueno', '👑', 'Dueño'], ['encargado', '📋', 'Encargada'], ['mesero', '🧑‍🍳', 'Vendedor'],
-    ['cocina', '🍭', 'Preparador'], ['caja', '💰', 'Cajero'],
-  ];
   document.getElementById('app').innerHTML = `
   <div class="login-wrap">
     <div class="card login-card">
@@ -965,12 +972,8 @@ function renderLogin() {
         <button class="btn block" type="submit">Entrar</button>
       </form>
       <button class="btn secondary block" data-action="go-carta" style="margin-top:10px">🛍️ Ver la carta y pedir para llevar</button>
-      <p class="muted login-hint">Accesos de prueba (contraseña <strong>1234</strong>):</p>
-      <div class="quick">
-        ${quick.map(([u, e, l]) => `<button data-action="quick-login" data-u="${u}"><span class="q-emoji">${e}</span>${l}</button>`).join('')}
-      </div>
       <p class="muted login-tip">📱 Los clientes no inician sesión: escanean el QR de su mesa o piden para llevar desde la carta.</p>
-      ${RATE && RATE.tasa ? `<p class="muted login-tip">💱 1 € = ${bs(1)} · Tasa BCV${RATE.fechaValorLegible ? ' (fecha valor: ' + RATE.fechaValorLegible + ')' : ''}</p>` : ''}
+      ${RATE && RATE.tasa ? `<p class="muted login-tip">💱 1 $ = ${bs(1)} · Tasa BCV${RATE.fechaValorLegible ? ' (fecha valor: ' + RATE.fechaValorLegible + ')' : ''}</p>` : ''}
     </div>
   </div>`;
 }
@@ -982,17 +985,6 @@ async function act(action, el, ev) {
   const id = el?.dataset?.id;
   switch (action) {
     /* ---- sesión ---- */
-    case 'quick-login': {
-      const u = el.dataset.u;
-      document.getElementById('lg-user').value = u;
-      document.getElementById('lg-pass').value = '1234';
-      const data = await api('/login', { method: 'POST', body: { username: u, password: '1234' } });
-      saveSession(data.token, data.user);
-      S.tab = defaultTab(data.user.role);
-      location.hash = '#/app';
-      toast('Bienvenido, ' + data.user.name);
-      break;
-    }
     case 'logout': {
       await api('/logout', { method: 'POST' }).catch(() => {});
       clearSession();
@@ -1316,8 +1308,8 @@ function stopPoll() { if (S.poll) clearInterval(S.poll); S.poll = null; }
 
 window.addEventListener('hashchange', () => route().catch(e => toast(e.message, 'err')));
 
-/* ---------------- Tasa del euro del BCV (consultada desde el navegador) ---------------- */
-const RATE_CACHE_KEY = 'fritik_rate_v1';
+/* ---------------- Tasa oficial del dólar del BCV (consultada desde el navegador) ---------------- */
+const RATE_CACHE_KEY = 'fritik_rate_v2';
 const RATE_TTL = 6 * 60 * 60 * 1000;
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio',
   'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
@@ -1331,19 +1323,13 @@ function fechaLegible(iso) {
   return `${DIAS[dow]} ${d} de ${MESES[m - 1]} de ${y}`;
 }
 
-async function fetchBcvEuro() {
-  const [euro, dolar] = await Promise.all([
-    fetch('https://ve.dolarapi.com/v1/euros/oficial').then(r => r.json()),
-    fetch('https://ve.dolarapi.com/v1/dolares/oficial').then(r => r.json()).catch(() => null),
-  ]);
-  let tasa = Number(euro && euro.promedio);
-  const usd = Number(dolar && dolar.promedio);
+async function fetchBcvDolar() {
+  const dolar = await fetch('https://ve.dolarapi.com/v1/dolares/oficial').then(r => r.json());
+  let tasa = Number(dolar && dolar.promedio);
   // La API a veces devuelve "1.006" cuando el BCV publica "1.006,03" (miles).
   if (Number.isFinite(tasa) && tasa > 0 && tasa < 50) tasa *= 1000;
   if (!Number.isFinite(tasa) || tasa <= 0) return null;
-  // Cordura: el euro debe moverse en un rango razonable frente al dólar.
-  if (Number.isFinite(usd) && usd > 100 && (tasa < usd * 0.5 || tasa > usd * 2)) return null;
-  const fechaValor = String((euro && euro.fechaActualizacion) || '').slice(0, 10) || null;
+  const fechaValor = String((dolar && dolar.fechaActualizacion) || '').slice(0, 10) || null;
   return {
     tasa,
     fechaValor,
@@ -1362,7 +1348,7 @@ async function loadRate(force) {
     return;
   }
   try {
-    const r = await fetchBcvEuro();
+    const r = await fetchBcvDolar();
     if (r) {
       RATE = r;
       localStorage.setItem(RATE_CACHE_KEY, JSON.stringify({ ...r, at: Date.now() }));
@@ -1373,7 +1359,7 @@ async function loadRate(force) {
 }
 
 (async function init() {
-  await loadRate();                    // tasa del euro del BCV antes de pintar
+  await loadRate();                    // tasa oficial del dólar del BCV antes de pintar
   await route().catch(e => { console.error(e); renderLogin(); });
   // reconsulta la tasa cada 30 minutos y repinta si no hay modal abierto
   setInterval(async () => {
