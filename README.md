@@ -57,6 +57,12 @@ Los precios se muestran en dólares (**$**) y su equivalente en bolívares con
 la **tasa oficial del dólar del BCV**, consultada desde
 `ve.dolarapi.com/v1/dolares/oficial`.
 
+Cuando un pedido de mesa queda **pagado**, desaparece de la vista del cliente:
+el historial de la mesa (productos y montos vendidos) es privado del negocio.
+El **encargado** y el **dueño** pueden **eliminar** un pedido desde la pestaña
+Pedidos (botón 🗑️ Eliminar, con confirmación); si la mesa queda sin pedidos
+abiertos, se libera automáticamente.
+
 ## Carta
 
 La especialidad abre la carta: **Churros** (10 productos, marcados como
@@ -94,4 +100,4 @@ GitHub Pages (rama `main`, carpeta `/docs`):
 `https://appmovilesoficial.github.io/fritik`
 
 > Fritik y Chilokos comparten el origen `appmovilesoficial.github.io`, por eso
-> las claves de `localStorage` son distintas: `fritik_token` y `fritik_rate_v1`.
+> las claves de `localStorage` son distintas: `fritik_token` y `fritik_rate_v2`.

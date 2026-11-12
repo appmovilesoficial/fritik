@@ -379,12 +379,15 @@ function clienteMenu(menu) {
 }
 
 function clientePedido(orders) {
-  const activos = orders.filter(o => !['pagado', 'cancelado'].includes(o.status));
-  const historial = orders.filter(o => ['pagado', 'cancelado'].includes(o.status));
-  if (!orders.length) {
-    return `<div class="empty"><span class="big">🧾</span>Aún no has hecho un pedido.<br/>
+  // El cliente solo ve pedidos activos: los pagados desaparecen de su vista
+  // (no debe ver el historial ni los montos de lo ya vendido).
+  const visibles = orders.filter(o => o.status !== 'pagado');
+  if (!visibles.length) {
+    return `<div class="empty"><span class="big">🧾</span>No tienes pedidos activos.<br/>
       <br/><button class="btn" data-action="tab" data-tab="menu">Ver el menú</button></div>`;
   }
+  const activos = visibles.filter(o => o.status !== 'cancelado');
+  const cancelados = visibles.filter(o => o.status === 'cancelado');
   const card = o => `<div class="card" style="margin-bottom:12px">
     <div class="row">
       <strong>Pedido #${o.id}</strong> ${chip(o.status)}
@@ -405,9 +408,9 @@ function clientePedido(orders) {
     </div>
   </div>`;
   return `
-    <div class="section-title">Pedidos activos</div>
+    <div class="section-title">Mis pedidos</div>
     ${activos.map(card).join('') || '<div class="empty">Sin pedidos activos</div>'}
-    ${historial.length ? `<div class="section-title">Historial</div>${historial.map(card).join('')}` : ''}`;
+    ${cancelados.length ? `<div class="section-title">Cancelados</div>${cancelados.map(card).join('')}` : ''}`;
 }
 
 function clienteMesa() {
@@ -606,9 +609,21 @@ function pedidosView(orders, withServe) {
         ${withServe && o.status === 'listo' ? `<button class="btn green small" data-action="set-status" data-id="${o.id}" data-status="servido">✅ Marcar entregado</button>` : ''}
         ${withServe && !['pagado', 'cancelado'].includes(o.status) ? `<button class="btn blue small" data-action="add-items" data-id="${o.id}">➕ Agregar</button>` : ''}
         ${S.user.role !== 'mesero' && !['pagado', 'cancelado'].includes(o.status) ? `<button class="btn red small" data-action="cancel-order" data-id="${o.id}">✖ Cancelar</button>` : ''}
+        ${['encargado', 'dueno'].includes(S.user.role) ? `<button class="btn ghost small" data-action="delete-order" data-id="${o.id}">🗑️ Eliminar</button>` : ''}
       </div>
     </div>`).join('')}
   </div>`;
+}
+
+function deleteOrderModal(orderId) {
+  openModal(`
+    <h2>🗑️ Eliminar pedido #${orderId}</h2>
+    <p class="muted">Se borrará el pedido del sistema y la mesa quedará libre si no tiene otros
+    pedidos abiertos. Esta acción no se puede deshacer.</p>
+    <div class="actions">
+      <button class="btn secondary" data-action="close-modal">Cancelar</button>
+      <button class="btn red" data-action="confirm-delete-order" data-id="${orderId}">🗑️ Sí, eliminar</button>
+    </div>`);
 }
 
 /* ---------------- COCINERO ---------------- */
@@ -1075,6 +1090,14 @@ async function act(action, el, ev) {
       if (!confirm('¿Cancelar este pedido?')) return;
       await api(`/orders/${id}/status`, { method: 'PATCH', body: { status: 'cancelado' } });
       toast('Pedido cancelado');
+      render();
+      break;
+    }
+    case 'delete-order': deleteOrderModal(Number(id)); break;
+    case 'confirm-delete-order': {
+      await api(`/orders/${id}`, { method: 'DELETE' });
+      closeModal();
+      toast('Pedido eliminado 🗑️');
       render();
       break;
     }

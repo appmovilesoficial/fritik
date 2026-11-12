@@ -257,7 +257,13 @@ function totalOf(order) {
 function visibleOrders(user, orders) {
   switch (user.role) {
     case 'cliente':
-      if (user.tableId) return orders.filter(function (o) { return o.tableId === user.tableId; });
+      // El cliente de una mesa no ve los pedidos ya pagados: el historial
+      // (qué se vendió y por cuánto) es privado del negocio.
+      if (user.tableId) {
+        return orders.filter(function (o) {
+          return o.tableId === user.tableId && o.status !== 'pagado';
+        });
+      }
       return orders.filter(function (o) { return o.createdById === user.id; });
     case 'cocinero':
       return orders.filter(function (o) { return ['nuevo', 'preparando', 'listo'].indexOf(o.status) !== -1; });
@@ -432,6 +438,31 @@ apiRoute_('POST', '/api/orders/:id/pay', [auth, requireRole('cajero', 'encargado
   for (var k in order) out[k] = order[k];
   out.total = total;
   res.json(out);
+}]);
+
+apiRoute_('DELETE', '/api/orders/:id', [minRank(4), function (req, res) {
+  var db = D();
+  var id = Number(req.params.id);
+  var order = db.orders.filter(function (o) { return o.id === id; })[0];
+  if (!order) return res.status(404).json({ error: 'Pedido no encontrado' });
+
+  var antes = db.orders.length;
+  db.orders = db.orders.filter(function (o) { return o.id !== id; });
+  if (db.orders.length === antes) return res.status(404).json({ error: 'Pedido no encontrado' });
+
+  // Si la mesa se queda sin pedidos abiertos, vuelve a quedar libre.
+  if (order.tableId) {
+    var otherOpen = db.orders.some(function (o) {
+      return o.tableId === order.tableId && ['pagado', 'cancelado'].indexOf(o.status) === -1;
+    });
+    if (!otherOpen) {
+      var table = db.tables.filter(function (t) { return t.id === order.tableId; })[0];
+      if (table) table.status = 'libre';
+    }
+  }
+  save();
+
+  res.json({ ok: true, id: id, deleted: true });
 }]);
 
 /* ---------------- Notificaciones ---------------- */
