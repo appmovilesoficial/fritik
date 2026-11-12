@@ -63,6 +63,16 @@ El **encargado** y el **dueño** pueden **eliminar** un pedido desde la pestaña
 Pedidos (botón 🗑️ Eliminar, con confirmación); si la mesa queda sin pedidos
 abiertos, se libera automáticamente.
 
+El **teléfono del cliente es obligatorio** al enviar un pedido (se guarda en el
+navegador para la próxima vez). En los paneles de vendedor, preparador, cajero,
+encargado y dueño aparece el botón **📲 WhatsApp** en cada pedido: genera una
+imagen tipo ticket con número de pedido, productos, cantidades y precios, y
+abre el resumen escrito en WhatsApp. En el celular, **Compartir imagen** envía
+la imagen directamente al chat; en computadora se descarga y se adjunta. Para
+envío 100 % automático haría falta la API de WhatsApp Business.
+
+El cliente no ve el botón **Salir** ni la pantalla de login del personal.
+
 ## Carta
 
 La especialidad abre la carta: **Churros** (10 productos, marcados como

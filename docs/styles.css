@@ -316,6 +316,10 @@ table.data tr:last-child td { border-bottom: none; }
 .modal.wide { max-width: 720px; }
 .modal h2 { font-size: 21px; margin-bottom: 14px; }
 .modal .actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
+.wa-ticket {
+  display: block; width: 100%; max-width: 430px; margin: 12px auto;
+  border-radius: 14px; box-shadow: 0 8px 22px rgba(70, 38, 17, .22);
+}
 
 /* ---------- Toasts ---------- */
 #toast-container { position: fixed; top: 16px; right: 16px; z-index: 90; display: flex; flex-direction: column; gap: 8px; }

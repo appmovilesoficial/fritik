@@ -304,6 +304,12 @@ apiRoute_('POST', '/api/orders', [auth, function (req, res) {
 
   var orderType = (!table || b.orderType === 'llevar') ? 'llevar' : 'sitio';
   var nombre = String(b.customerName || '').trim().slice(0, 40);
+  var telefono = String(b.customerPhone || '').trim().slice(0, 30);
+
+  // El teléfono es obligatorio para el cliente: con él se le avisa por WhatsApp.
+  if (req.user.role === 'cliente' && telefono.replace(/\D/g, '').length < 7) {
+    return res.status(400).json({ error: 'Escribe un número de teléfono válido para avisarte del pedido' });
+  }
 
   var orderItems = [];
   for (var i = 0; i < b.items.length; i++) {
@@ -323,6 +329,7 @@ apiRoute_('POST', '/api/orders', [auth, function (req, res) {
     tableNumber: table ? table.number : null,
     orderType: orderType,
     customerName: orderType === 'llevar' ? (nombre || req.user.name) : null,
+    customerPhone: telefono || null,
     items: orderItems,
     notes: String(b.notes || '').slice(0, 300),
     status: 'nuevo',

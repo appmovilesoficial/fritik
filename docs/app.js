@@ -11,6 +11,7 @@ const S = {
   cart: [],
   orderType: null,        // 'sitio' | 'llevar'
   customerName: '',
+  customerPhone: localStorage.getItem('fritik_phone') || '',
   menu: [],
   modalOpen: false,
   poll: null,
@@ -53,6 +54,184 @@ function ago(ts) {
   if (m < 1) return 'ahora';
   if (m < 60) return `hace ${m} min`;
   return `hace ${Math.floor(m / 60)} h`;
+}
+
+/* ---------------- WhatsApp: aviso del pedido al cliente ---------------- */
+const soloDigitos = p => String(p || '').replace(/\D/g, '');
+
+function phoneWa(p) {
+  let d = soloDigitos(p);
+  if (!d) return '';
+  if (d.length === 11 && d.charAt(0) === '0') d = '58' + d.slice(1);  // 0414… → 58414…
+  else if (d.length === 10 && d.charAt(0) === '4') d = '58' + d;      // 414…  → 58414…
+  return d;
+}
+
+function waResumen(o) {
+  const lineas = (o.items || []).map(i => `• ${i.qty}× ${i.name} — ${money(i.price * i.qty)}`);
+  return [
+    '🍭 *Fritik — puro antojo*',
+    `Pedido *#${o.id}*${o.orderType === 'llevar' ? ' · 🛍️ Para llevar' : ' · 🪑 Mesa ' + o.tableNumber}`,
+    o.customerName ? `Cliente: ${o.customerName}` : null,
+    '',
+    ...lineas,
+    o.notes ? `📝 ${o.notes}` : null,
+    '',
+    `*Total: ${money(o.total)}*  (${bs(o.total)})`,
+    '',
+    '¡Gracias por tu antojo! 🍭',
+  ].filter(l => l !== null && l !== undefined).join('\n');
+}
+
+const waHref = o => `https://wa.me/${phoneWa(o.customerPhone)}?text=${encodeURIComponent(waResumen(o))}`;
+
+// Botón de WhatsApp: solo aparece si el pedido tiene teléfono
+const waBoton = (o, extraClass = '') => (phoneWa(o.customerPhone)
+  ? `<button class="btn green small ${extraClass}" data-action="wa-order" data-id="${o.id}">📲 WhatsApp</button>`
+  : '');
+
+// Genera una imagen (PNG) con el ticket del pedido para enviarla por WhatsApp
+function ordenTicketPng(o) {
+  const W = 720, rowH = 34;
+  const items = o.items || [];
+  const itemTop = 268;
+  const notasBlock = o.notes ? 34 : 0;
+  const totalTop = itemTop + items.length * rowH + notasBlock + 14;
+  const H = totalTop + 160;
+
+  const cv = document.createElement('canvas');
+  const scale = 2;
+  cv.width = W * scale;
+  cv.height = H * scale;
+  const ctx = cv.getContext('2d');
+  ctx.scale(scale, scale);
+
+  const rr = (x, y, w, h, r) => {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+  };
+  const fit = (text, maxW) => {
+    let t = String(text || '');
+    if (ctx.measureText(t).width <= maxW) return t;
+    while (t.length > 1 && ctx.measureText(t + '…').width > maxW) t = t.slice(0, -1);
+    return t + '…';
+  };
+
+  ctx.fillStyle = '#dfb51d';
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = '#fffaf0';
+  rr(20, 20, W - 40, H - 40, 26);
+  ctx.fill();
+
+  ctx.fillStyle = '#e84a7a';
+  rr(20, 20, W - 40, 12, 6);
+  ctx.fill();
+
+  ctx.fillStyle = '#462611';
+  ctx.font = '800 42px "Baloo 2", "Nunito", sans-serif';
+  ctx.fillText('Fritik', 48, 84);
+  ctx.fillStyle = '#e84a7a';
+  ctx.font = '700 22px "Nunito", sans-serif';
+  ctx.fillText('puro antojo', 196, 82);
+
+  ctx.fillStyle = '#462611';
+  ctx.font = '800 34px "Baloo 2", "Nunito", sans-serif';
+  ctx.fillText('Pedido #' + o.id, 48, 140);
+
+  const cuando = new Date(o.createdAt).toLocaleString('es-VE', {
+    weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  });
+  ctx.fillStyle = '#7a5a45';
+  ctx.font = '600 20px "Nunito", sans-serif';
+  ctx.fillText(o.orderType === 'llevar' ? '🛍️ Para llevar · ' + cuando : '🪑 Mesa ' + o.tableNumber + ' · ' + cuando, 48, 172);
+
+  const cliente = [o.customerName, o.customerPhone ? '📱 ' + o.customerPhone : ''].filter(Boolean).join('  ·  ');
+  if (cliente) {
+    ctx.fillStyle = '#462611';
+    ctx.font = '600 20px "Nunito", sans-serif';
+    ctx.fillText(fit(cliente, W - 96), 48, 202);
+  }
+
+  ctx.strokeStyle = 'rgba(70, 38, 17, .18)';
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(48, 224); ctx.lineTo(W - 48, 224); ctx.stroke();
+
+  let y = itemTop;
+  for (const i of items) {
+    ctx.fillStyle = '#462611';
+    ctx.font = '700 21px "Nunito", sans-serif';
+    ctx.fillText(fit(`${i.qty}×  ${i.name}`, 430), 48, y);
+    ctx.textAlign = 'right';
+    ctx.font = '800 21px "Nunito", sans-serif';
+    ctx.fillText(money(i.price * i.qty), W - 48, y);
+    ctx.textAlign = 'left';
+    y += rowH;
+  }
+
+  if (o.notes) {
+    ctx.fillStyle = '#7a5a45';
+    ctx.font = '600 18px "Nunito", sans-serif';
+    ctx.fillText(fit('📝 ' + o.notes, W - 96), 48, y + 4);
+  }
+
+  ctx.strokeStyle = 'rgba(70, 38, 17, .18)';
+  ctx.beginPath(); ctx.moveTo(48, totalTop); ctx.lineTo(W - 48, totalTop); ctx.stroke();
+
+  ctx.fillStyle = '#462611';
+  ctx.font = '800 26px "Baloo 2", "Nunito", sans-serif';
+  ctx.fillText('Total', 48, totalTop + 46);
+  ctx.textAlign = 'right';
+  ctx.font = '800 34px "Baloo 2", "Nunito", sans-serif';
+  ctx.fillText(money(o.total), W - 48, totalTop + 46);
+  ctx.textAlign = 'left';
+
+  ctx.fillStyle = '#e84a7a';
+  ctx.font = '700 22px "Nunito", sans-serif';
+  ctx.fillText(bs(o.total), W - 48 - ctx.measureText(bs(o.total)).width, totalTop + 82);
+
+  ctx.fillStyle = '#7a5a45';
+  ctx.textAlign = 'center';
+  ctx.font = '700 20px "Nunito", sans-serif';
+  ctx.fillText('¡Gracias por tu antojo! 🍭', W / 2, H - 70);
+  ctx.font = '600 17px "Nunito", sans-serif';
+  ctx.fillText('Fritik · churros y dulces', W / 2, H - 44);
+  ctx.textAlign = 'left';
+
+  return cv.toDataURL('image/png');
+}
+
+function waModal(o) {
+  const png = ordenTicketPng(o);
+  S._waTicket = { id: o.id, dataUrl: png };
+  let puedeCompartir = false;
+  try {
+    const dummy = new File([new Blob([new Uint8Array([137, 80, 78, 71])])], 't.png', { type: 'image/png' });
+    puedeCompartir = !!(navigator.canShare && navigator.canShare({ files: [dummy] }));
+  } catch (e) { puedeCompartir = false; }
+
+  openModal(`
+    <h2>📲 Avisar por WhatsApp — Pedido #${o.id}</h2>
+    <p class="muted">${esc(o.customerName || 'Cliente')} · 📱 ${esc(o.customerPhone || '')} · ${destino(o)}</p>
+    <img class="wa-ticket" src="${png}" alt="Ticket del pedido #${o.id}"/>
+    <p class="muted" style="font-size:12px;line-height:1.45">En el celular, <strong>Compartir imagen</strong> abre WhatsApp con
+    la imagen lista para enviar. En computadora, descarga la imagen y adjúntala en el chat.
+    <strong>Abrir WhatsApp</strong> lleva el resumen escrito del pedido.</p>
+    <div class="actions" style="flex-wrap:wrap">
+      <button class="btn secondary" data-action="close-modal">Cerrar</button>
+      <button class="btn blue" data-action="wa-download" data-id="${o.id}">⬇️ Descargar imagen</button>
+      ${puedeCompartir ? `<button class="btn" data-action="wa-share" data-id="${o.id}">📤 Compartir imagen</button>` : ''}
+      <a class="btn green" href="${waHref(o)}" target="_blank" rel="noopener">📲 Abrir WhatsApp</a>
+    </div>`, true);
 }
 
 /* ---------------- API (Google Apps Script) ---------------- */
@@ -278,7 +457,7 @@ function topbar() {
       <span>${esc(S.user.name)}</span>
       <span class="badge ${S.user.role}">${ROLE_LABEL[S.user.role]}</span>
       ${notifBadge}
-      <button class="btn small secondary" data-action="logout">Salir</button>
+      ${S.user.role === 'cliente' ? '' : '<button class="btn small secondary" data-action="logout">Salir</button>'}
     </div>
   </div>${rateBar()}`;
 }
@@ -437,17 +616,24 @@ function orderTypeActual() {
   return S.orderType || (S.table ? 'sitio' : 'llevar');
 }
 
-// Repinta el modal conservando el nombre y las notas ya escritas
+// Repinta el modal conservando el nombre, teléfono y notas ya escritas
 function rebuildCartModal() {
   const notes = document.getElementById('order-notes');
   const name = document.getElementById('order-name');
-  const vals = { notes: notes ? notes.value : '', name: name ? name.value : '' };
+  const phone = document.getElementById('order-phone');
+  const vals = {
+    notes: notes ? notes.value : '',
+    name: name ? name.value : '',
+    phone: phone ? phone.value : '',
+  };
   const focusId = document.activeElement ? document.activeElement.id : '';
   cartModal();
   const n = document.getElementById('order-notes');
   const nm = document.getElementById('order-name');
+  const ph = document.getElementById('order-phone');
   if (n) n.value = vals.notes;
   if (nm && vals.name) nm.value = vals.name;
+  if (ph && vals.phone) ph.value = vals.phone;
   if (focusId && document.getElementById(focusId)) document.getElementById(focusId).focus();
 }
 
@@ -488,8 +674,14 @@ function cartModal() {
       <input id="order-name" maxlength="40" placeholder="Tu nombre" value="${esc(S.customerName || '')}"/>
     </div>` : ''}
     <div class="field">
+      <label>Número de teléfono *</label>
+      <input id="order-phone" type="tel" inputmode="tel" autocomplete="tel" maxlength="30"
+        placeholder="0414-1234567" value="${esc(S.customerPhone || '')}"/>
+      <div class="muted" style="margin-top:4px;font-size:12px">Te avisamos por WhatsApp cuando tu pedido esté listo.</div>
+    </div>
+    <div class="field">
       <label>Notas para preparación (opcional)</label>
-      <input id="order-notes" placeholder="Ej: sin cebolla, salsa aparte…" maxlength="300"/>
+      <input id="order-notes" placeholder="Ej: sin azúcar, chocolate aparte…" maxlength="300"/>
     </div>
     <div class="cart-total"><span>Total</span><span>${price(total)}</span></div>
     <div class="actions">
@@ -530,6 +722,7 @@ async function buildStaff(seq) {
   if (summary) data.summary = summary;
   if (notifs) data.notifs = notifs;
   S.notifCount = notifs ? notifs.length : 0;
+  S._ordersCache = orders;   // para pagos, WhatsApp y tickets
 
   let body = '';
   switch (role) {
@@ -577,10 +770,12 @@ function tableModal(tableId, tables, orders) {
     <div style="margin-top:12px">
       ${act.map(o => `<div class="ticket">
         <div class="head"><span>Pedido #${o.id} · ${esc(o.createdBy)}</span>${chip(o.status)}</div>
+        ${o.customerPhone ? `<div class="notes">📱 ${esc(o.customerPhone)}${o.customerName ? ' · ' + esc(o.customerName) : ''}</div>` : ''}
         <ul>${o.items.map(i => `<li><span class="q">${i.qty}×</span> ${i.emoji} ${esc(i.name)}</li>`).join('')}</ul>
         <div class="actions">
           ${o.status === 'listo' ? `<button class="btn green small" data-action="set-status" data-id="${o.id}" data-status="servido">✅ Entregar</button>` : ''}
           ${!['pagado', 'cancelado'].includes(o.status) ? `<button class="btn blue small" data-action="add-items" data-id="${o.id}">➕ Agregar productos</button>` : ''}
+          ${waBoton(o)}
         </div>
       </div>`).join('') || '<div class="empty">Sin pedidos activos en esta mesa</div>'}
     </div>
@@ -599,7 +794,7 @@ function pedidosView(orders, withServe) {
         <strong>#${o.id} · ${destino(o)}</strong> ${chip(o.status)}
         <span class="spacer"></span><span class="muted">${ago(o.createdAt)}</span>
       </div>
-      <div class="muted" style="margin-top:4px">Por ${esc(o.createdBy)}</div>
+      <div class="muted" style="margin-top:4px">Por ${esc(o.createdBy)}${o.customerPhone ? ` · 📱 ${esc(o.customerPhone)}` : ''}</div>
       <div style="margin-top:10px">
         ${o.items.map(i => `<div class="cart-line"><span>${i.emoji} ${i.qty}× ${esc(i.name)}</span><span>${price(i.price * i.qty)}</span></div>`).join('')}
       </div>
@@ -608,6 +803,7 @@ function pedidosView(orders, withServe) {
       <div class="row" style="margin-top:10px">
         ${withServe && o.status === 'listo' ? `<button class="btn green small" data-action="set-status" data-id="${o.id}" data-status="servido">✅ Marcar entregado</button>` : ''}
         ${withServe && !['pagado', 'cancelado'].includes(o.status) ? `<button class="btn blue small" data-action="add-items" data-id="${o.id}">➕ Agregar</button>` : ''}
+        ${waBoton(o)}
         ${S.user.role !== 'mesero' && !['pagado', 'cancelado'].includes(o.status) ? `<button class="btn red small" data-action="cancel-order" data-id="${o.id}">✖ Cancelar</button>` : ''}
         ${['encargado', 'dueno'].includes(S.user.role) ? `<button class="btn ghost small" data-action="delete-order" data-id="${o.id}">🗑️ Eliminar</button>` : ''}
       </div>
@@ -642,6 +838,7 @@ function cocineroView(data) {
         <h3>${title} <span class="count">${list.length}</span></h3>
         ${list.map(o => `<div class="ticket">
           <div class="head"><span>#${o.id} · ${destino(o)}</span><span>${ago(o.createdAt)}</span></div>
+          ${o.customerPhone ? `<div class="notes">📱 ${esc(o.customerPhone)}${o.customerName ? ' · ' + esc(o.customerName) : ''}</div>` : ''}
           <ul>
             ${o.items.map(i => `<li><span class="q">${i.qty}×</span> <span>${i.emoji} ${esc(i.name)}</span></li>
               ${i.notes ? `<div class="notes">↳ ${esc(i.notes)}</div>` : ''}`).join('')}
@@ -651,6 +848,7 @@ function cocineroView(data) {
             ${st === 'nuevo' ? `<button class="btn blue block small" data-action="set-status" data-id="${o.id}" data-status="preparando">👨‍🍳 Empezar a preparar</button>` : ''}
             ${st === 'preparando' ? `<button class="btn green block small" data-action="set-status" data-id="${o.id}" data-status="listo">🔔 Marcar listo</button>` : ''}
             ${st === 'listo' ? `<span class="muted">Esperando al vendedor…</span>` : ''}
+            ${waBoton(o, 'block')}
           </div>
         </div>`).join('') || '<div class="empty">Vacío</div>'}
       </div>`;
@@ -667,12 +865,13 @@ function cajeroView(tab, data) {
 
   if (tab === 'cobrados') {
     return `<div class="section-title">✅ Cobrados hoy <span class="chip pagado">${price(todayTotal)}</span></div>
-    ${today.length ? `<div class="card"><table class="data">        <tr><th>#</th><th>Mesa</th><th>Método</th><th>Hora</th><th>Total</th></tr>
+    ${today.length ? `<div class="card"><table class="data">        <tr><th>#</th><th>Mesa</th><th>Método</th><th>Hora</th><th>Total</th><th></th></tr>
       ${today.map(o => `<tr>
         <td>${o.id}</td><td>${o.orderType === 'llevar' ? 'Llevar' : o.tableNumber}</td>
         <td>${o.payments.map(p => p.method).join(', ')}</td>
         <td>${new Date(o.payments[o.payments.length - 1].at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</td>
         <td><strong>${price(o.total)}</strong></td>
+        <td>${waBoton(o)}</td>
       </tr>`).join('')}
     </table></div>` : '<div class="empty"><span class="big">💰</span>Aún no hay cobros hoy</div>'}`;
   }
@@ -687,6 +886,7 @@ function cajeroView(tab, data) {
         ${o.items.map(i => `<div class="cart-line"><span>${i.qty}× ${esc(i.name)}</span><span>${price(i.price * i.qty)}</span></div>`).join('')}
       </div>
       <div class="cart-total"><span>Total</span><span>${price(o.total)}</span></div>
+      ${o.customerPhone ? `<div class="row" style="margin-top:10px"><span class="muted">📱 ${esc(o.customerPhone)}</span><span class="spacer"></span>${waBoton(o)}</div>` : ''}
       <button class="btn green block" style="margin-top:12px" data-action="pay-order" data-id="${o.id}">💵 Cobrar ${price(o.total)}</button>
     </div>`).join('')}
   </div>` : `<div class="empty"><span class="big">✅</span>No hay pedidos pendientes de cobro</div>`}
@@ -1001,6 +1201,13 @@ async function act(action, el, ev) {
   switch (action) {
     /* ---- sesión ---- */
     case 'logout': {
+      // El cliente nunca debe ver la pantalla de login del personal:
+      // si por alguna razón llega aquí, simplemente vuelve a su menú.
+      if (S.user && S.user.role === 'cliente') {
+        S.tab = 'menu';
+        render();
+        break;
+      }
       await api('/logout', { method: 'POST' }).catch(() => {});
       clearSession();
       stopPoll();
@@ -1041,7 +1248,13 @@ async function act(action, el, ev) {
       const notes = document.getElementById('order-notes')?.value || '';
       const customerName = (document.getElementById('order-name')?.value || S.customerName || '').trim();
       if (!S.table && !customerName) return toast('Escribe tu nombre para el pedido para llevar', 'err');
+      const customerPhone = (document.getElementById('order-phone')?.value || S.customerPhone || '').trim();
+      if (soloDigitos(customerPhone).length < 7) {
+        return toast('Escribe tu número de teléfono para avisarte del pedido', 'err');
+      }
       S.customerName = customerName;
+      S.customerPhone = customerPhone;
+      localStorage.setItem('fritik_phone', customerPhone);
       const data = await api('/orders', {
         method: 'POST',
         body: {
@@ -1050,6 +1263,7 @@ async function act(action, el, ev) {
           notes,
           orderType: orderTypeActual(),
           customerName,
+          customerPhone,
         },
       });
       S.cart = [];
@@ -1099,6 +1313,37 @@ async function act(action, el, ev) {
       closeModal();
       toast('Pedido eliminado 🗑️');
       render();
+      break;
+    }
+    case 'wa-order': {
+      let o = (S._ordersCache || []).find(x => x.id === Number(id));
+      if (!o) { S._ordersCache = await api('/orders'); o = S._ordersCache.find(x => x.id === Number(id)); }
+      if (!o) return toast('Pedido no encontrado', 'err');
+      waModal(o);
+      break;
+    }
+    case 'wa-download': {
+      if (!S._waTicket) return;
+      const a = document.createElement('a');
+      a.href = S._waTicket.dataUrl;
+      a.download = `fritik-pedido-${S._waTicket.id}.png`;
+      a.click();
+      break;
+    }
+    case 'wa-share': {
+      const t = S._waTicket;
+      const o = (S._ordersCache || []).find(x => x.id === Number(id));
+      if (!t || !o) return toast('Pedido no encontrado', 'err');
+      try {
+        const blob = await (await fetch(t.dataUrl)).blob();
+        const file = new File([blob], `fritik-pedido-${o.id}.png`, { type: 'image/png' });
+        if (!navigator.canShare || !navigator.canShare({ files: [file] })) {
+          return toast('Este navegador no permite compartir imágenes', 'err');
+        }
+        await navigator.share({ files: [file], title: 'Fritik — pedido #' + o.id, text: waResumen(o) });
+      } catch (e) {
+        if (e && e.name !== 'AbortError') toast('No se pudo compartir la imagen', 'err');
+      }
       break;
     }
     case 'add-items': addItemsModal(id); break;
