@@ -30,11 +30,16 @@ apps-script/fritik/       Backend (Google Apps Script)
 ## Backend actual
 
 - Proyecto Apps Script: **Fritik**
-- scriptId: `1XHfP7fJ6IFBHCsdI5_GxwakJAluVTEiXIoQ_XC9zQ09Jsjc5OxXTLtvB`
+- Cuenta dueña: **`cunaguaroshop@gmail.com`**
+- scriptId: `1a8cngHLphbd6yvpOa2bDTNLZOTzW7ErQPmNvafgeIEc5tn8aGTw_NZpO`
 - Deployment `/exec`:
-  `https://script.google.com/macros/s/AKfycbwtryBHPVmaPMnTNJb3wUu4FWZPvHCTzDG2fqKEol5CxR9sALdfLJhfmPmtQpSv3Qc2/exec`
+  `https://script.google.com/macros/s/AKfycbxC4Gz497nJmv2Z828zNyt7oc2EK-vzDpbi1CZhRKCNjSxP39Kk9h3-fCKmKefijkuS/exec`
 - Base de datos: `PropertiesService.getScriptProperties()` de ese proyecto,
   claves `FRITIK_DB_*` (no comparte nada con Chilokos).
+
+> Este proyecto fue creado bajo `cunaguaroshop@gmail.com`. En clasp se usa la
+> credencial nombrada: `clasp -u cunaguaroshop ...` (el token `default` sigue
+> perteneciendo a la cuenta de Chilokos).
 
 ## Accesos demo (contraseña `1234`)
 
@@ -69,7 +74,33 @@ encargado y dueño aparece el botón **📲 WhatsApp** en cada pedido: genera un
 imagen tipo ticket con número de pedido, productos, cantidades y precios, y
 abre el resumen escrito en WhatsApp. En el celular, **Compartir imagen** envía
 la imagen directamente al chat; en computadora se descarga y se adjunta. Para
-envío 100 % automático haría falta la API de WhatsApp Business.
+envío 100 % automático desde el número del negocio haría falta la API de
+WhatsApp Business.
+
+## Avisos automáticos al WhatsApp del negocio
+
+Los pedidos creados por **clientes** se envían automáticamente al WhatsApp
+dedicado del negocio mediante **CallMeBot** (servicio gratuito). El aviso llega
+como texto con número de pedido, mesa o para llevar, cliente, teléfono,
+productos, cantidades y total.
+
+Configuración (pestaña **📲 Avisos** del encargado o dueño):
+
+1. Desde el WhatsApp del negocio, enviar `I allow callmebot to send me messages`
+   al **+34 644 51 95 23**.
+2. El bot responde una **apikey**.
+3. En la pestaña **📲 Avisos**, escribir el número del negocio, pegar la apikey
+   y pulsar **Guardar**.
+4. Pulsar **Enviar prueba** para confirmar que llega.
+
+La configuración se guarda en `PropertiesService` (`FRITIK_WA_*`), no en el
+código. El envío se hace después de guardar el pedido; si CallMeBot falla, el
+pedido igual se registra.
+
+> **Autorización única:** el backend usa `UrlFetchApp`, que requiere el permiso
+> de conexión externa. Si el `/exec` devuelve `403 Acceso denegado`, abrir el
+> editor de Apps Script con la cuenta dueña, seleccionar la función
+> `autorizarAvisos`, pulsar **Ejecutar** y aceptar los permisos una sola vez.
 
 El cliente no ve el botón **Salir** ni la pantalla de login del personal.
 
@@ -94,12 +125,14 @@ chocolates, postres y bebidas (36 productos en total).
 Desde `apps-script/fritik`:
 
 ```bash
-clasp push -f
-clasp create-version "descripcion"
-clasp deploy -V <version> -d "descripcion"
+clasp -u cunaguaroshop push -f
+clasp -u cunaguaroshop create-version "descripcion"
+clasp -u cunaguaroshop deploy -V <version> -d "descripcion"
 ```
 
-Copia la nueva URL `/exec` en `docs/config.js` (`window.FRITIK_API`).
+El flag `-u cunaguaroshop` usa la credencial nombrada de la cuenta dueña sin
+cambiar la sesión `default` de clasp (la de Chilokos). Copia la nueva URL
+`/exec` en `docs/config.js` (`window.FRITIK_API`).
 
 ## Frontend publicado
 

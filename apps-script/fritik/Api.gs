@@ -79,6 +79,144 @@ function createSession(user, guest) {
   return token;
 }
 
+/* ---------------- Avisos por WhatsApp del negocio (CallMeBot) ----------------
+ * Cada pedido creado por un cliente se envía automáticamente al WhatsApp del
+ * negocio usando el servicio gratuito CallMeBot. La configuración (número y
+ * apikey) se guarda en las propiedades del script, nunca en el código.
+ *
+ * El envío se hace DESPUÉS de liberar el bloqueo y de guardar la base, para no
+ * retrasar ni bloquear otras peticiones. Si falla, el pedido igual se crea.
+ */
+var WA_PHONE_KEY = 'FRITIK_WA_PHONE';
+var WA_APIKEY_KEY = 'FRITIK_WA_APIKEY';
+var WA_ENABLED_KEY = 'FRITIK_WA_ENABLED';
+var WA_LAST_KEY = 'FRITIK_WA_LAST';
+var _waPending = null;
+
+function waProps_() {
+  return PropertiesService.getScriptProperties();
+}
+
+function waConfig_() {
+  var p = waProps_();
+  var phone = String(p.getProperty(WA_PHONE_KEY) || '').trim();
+  var apikey = String(p.getProperty(WA_APIKEY_KEY) || '').trim();
+  return {
+    phone: phone,
+    apikey: apikey,
+    enabled: p.getProperty(WA_ENABLED_KEY) !== 'false',
+    configured: !!(phone && apikey),
+  };
+}
+
+// 0414-1234567 → +584141234567 (el formato que espera CallMeBot)
+function waPhoneE164_(phone) {
+  var d = String(phone || '').replace(/\D/g, '');
+  if (!d) return '';
+  if (d.length === 11 && d.charAt(0) === '0') d = '58' + d.slice(1);
+  else if (d.length === 10 && d.charAt(0) === '4') d = '58' + d;
+  return '+' + d;
+}
+
+function waMask_(value) {
+  var s = String(value || '');
+  if (!s) return '';
+  if (s.length <= 5) return '••••';
+  return s.slice(0, 2) + '••••' + s.slice(-3);
+}
+
+function waTextPedido_(order) {
+  var lineas = [];
+  lineas.push('🍭 *FRITIK — NUEVO PEDIDO #' + order.id + '*');
+  lineas.push(order.orderType === 'llevar' ? '🛍️ Para llevar' : '🪑 Mesa ' + order.tableNumber);
+  if (order.customerName) lineas.push('👤 ' + order.customerName);
+  lineas.push('📱 ' + (order.customerPhone || 'sin teléfono'));
+  lineas.push('');
+  (order.items || []).forEach(function (i) {
+    lineas.push('• ' + i.qty + '× ' + i.name + ' — $' + (i.price * i.qty).toFixed(2));
+  });
+  if (order.notes) {
+    lineas.push('');
+    lineas.push('📝 ' + order.notes);
+  }
+  lineas.push('');
+  lineas.push('*TOTAL: $' + totalOf(order).toFixed(2) + '*');
+  lineas.push('🕒 ' + Utilities.formatDate(new Date(order.createdAt), 'America/Caracas', 'dd/MM/yyyy · hh:mm a'));
+  return lineas.join('\n');
+}
+
+function waEnviar_(texto) {
+  var cfg = waConfig_();
+  if (!cfg.phone || !cfg.apikey) {
+    return { ok: false, at: Date.now(), error: 'Falta configurar el número y la clave de CallMeBot' };
+  }
+  var url = 'https://api.callmebot.com/whatsapp.php'
+    + '?phone=' + encodeURIComponent(waPhoneE164_(cfg.phone))
+    + '&text=' + encodeURIComponent(texto)
+    + '&apikey=' + encodeURIComponent(cfg.apikey);
+
+  var out;
+  try {
+    var res = UrlFetchApp.fetch(url, { muteHttpExceptions: true, followRedirects: true });
+    var code = res.getResponseCode();
+    var body = String(res.getContentText() || '').trim();
+    var ok = code >= 200 && code < 300 && !/error|invalid|not allowed|apikey/i.test(body);
+    out = { ok: ok, at: Date.now(), code: code, detail: body.slice(0, 180) };
+    if (!ok) out.error = body.slice(0, 180) || ('HTTP ' + code);
+  } catch (e) {
+    out = { ok: false, at: Date.now(), error: String((e && e.message) || e).slice(0, 180) };
+  }
+  try { waProps_().setProperty(WA_LAST_KEY, JSON.stringify(out)); } catch (e2) { /* opcional */ }
+  return out;
+}
+
+// Permite al dueño autorizar el permiso de conexión externa desde el editor.
+function autorizarAvisos() {
+  UrlFetchApp.fetch('https://api.callmebot.com/whatsapp.php', { muteHttpExceptions: true });
+  return 'Permiso de conexión externa autorizado';
+}
+
+/* ---------------- Ajustes del negocio ---------------- */
+apiRoute_('GET', '/api/settings/wa', [minRank(4), function (req, res) {
+  var cfg = waConfig_();
+  var last = null;
+  try { last = JSON.parse(waProps_().getProperty(WA_LAST_KEY) || 'null'); } catch (e) { last = null; }
+  res.json({
+    enabled: cfg.enabled,
+    configured: cfg.configured,
+    phone: cfg.phone,
+    apikeyMasked: cfg.apikey ? waMask_(cfg.apikey) : '',
+    last: last,
+  });
+}]);
+
+apiRoute_('POST', '/api/settings/wa', [minRank(4), function (req, res) {
+  var b = req.body || {};
+  var p = waProps_();
+  if (b.phone != null) p.setProperty(WA_PHONE_KEY, String(b.phone).trim());
+  if (b.apikey) p.setProperty(WA_APIKEY_KEY, String(b.apikey).trim());
+  if (b.clearApikey) p.deleteProperty(WA_APIKEY_KEY);
+  if (b.enabled != null) p.setProperty(WA_ENABLED_KEY, b.enabled ? 'true' : 'false');
+  var cfg = waConfig_();
+  res.json({
+    ok: true,
+    enabled: cfg.enabled,
+    configured: cfg.configured,
+    phone: cfg.phone,
+    apikeyMasked: cfg.apikey ? waMask_(cfg.apikey) : '',
+  });
+}]);
+
+apiRoute_('POST', '/api/settings/wa/test', [minRank(4), function (req, res) {
+  var cfg = waConfig_();
+  if (!cfg.phone || !cfg.apikey) {
+    return res.status(400).json({ error: 'Primero guarda el número y la clave de CallMeBot' });
+  }
+  var r = waEnviar_('🍭 *Fritik* — prueba de aviso automático ✅\nSi recibes este mensaje, los pedidos te llegarán aquí.');
+  if (!r.ok) return res.status(400).json({ error: r.error || 'No se pudo enviar el mensaje de prueba', detail: r.detail || null });
+  res.json({ ok: true, sent: true, detail: r.detail || '' });
+}]);
+
 /* ---------------- Auth ---------------- */
 apiRoute_('POST', '/api/login', [function (req, res) {
   var body = req.body || {};
@@ -342,6 +480,12 @@ apiRoute_('POST', '/api/orders', [auth, function (req, res) {
   db.orders.push(order);
   if (table) table.status = 'ocupada';
   save();
+
+  // Aviso automático al WhatsApp del negocio (solo pedidos de clientes).
+  // Se envía al terminar la petición, después de guardar y liberar el bloqueo.
+  if (req.user.role === 'cliente' && waConfig_().enabled) {
+    _waPending = waTextPedido_(order);
+  }
 
   var out = {};
   for (var k in order) out[k] = order[k];

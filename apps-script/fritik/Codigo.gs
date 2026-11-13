@@ -62,6 +62,7 @@ function doPost(e) { return handleRequest_(e); }
 
 function handleRequest_(e) {
   var result;
+  var pendienteWa = null;
   var lock = LockService.getScriptLock();
   var locked = false;
   try {
@@ -75,7 +76,14 @@ function handleRequest_(e) {
   } catch (err) {
     result = { __status: 500, error: String((err && err.message) || err) };
   } finally {
+    // El aviso de WhatsApp se envía con la base ya guardada y sin el bloqueo,
+    // para no retrasar ni bloquear otras peticiones al negocio.
+    pendienteWa = _waPending;
+    _waPending = null;
     if (locked) lock.releaseLock();
+  }
+  if (pendienteWa) {
+    try { waEnviar_(pendienteWa); } catch (e2) { /* el pedido ya quedó guardado */ }
   }
   return ContentService.createTextOutput(JSON.stringify(result))
     .setMimeType(ContentService.MimeType.JSON);

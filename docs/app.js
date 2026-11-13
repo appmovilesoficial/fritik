@@ -408,8 +408,9 @@ const TABS = {
     ['cobrados', '✅ Cobrados'],
     ['menu', '📖 Menú'],
     ['llamados', '🔔 Llamados'],
+    ['avisos', '📲 Avisos'],
   ],
-  dueno: [['dashboard', '📊 Dashboard'], ['reportes', '📈 Reportes'], ['pedidos', '🧾 Pedidos'], ['menu', '📖 Menú'], ['mesas', '🪑 Mesas y QR'], ['personal', '👥 Personal']],
+  dueno: [['dashboard', '📊 Dashboard'], ['reportes', '📈 Reportes'], ['pedidos', '🧾 Pedidos'], ['menu', '📖 Menú'], ['mesas', '🪑 Mesas y QR'], ['personal', '👥 Personal'], ['avisos', '📲 Avisos']],
 };
 const defaultTab = role => (TABS[role] || TABS.cliente)[0][0];
 
@@ -704,15 +705,17 @@ async function buildStaff(seq) {
   const needTables = isStaff && tab === 'mesas';
   const needNotifs = isStaff;
   const needMenu = isAdmin && tab === 'menu';
+  const needWa = isAdmin && tab === 'avisos';
   const needSummary = (role === 'encargado' && tab === 'resumen')
     || (role === 'dueno' && ['dashboard', 'reportes'].includes(tab));
 
-  const [tables, orders, notifs, menu, summary] = await Promise.all([
+  const [tables, orders, notifs, menu, summary, wa] = await Promise.all([
     needTables ? api('/tables') : null,
     api('/orders'),
     needNotifs ? api('/notifications') : null,
     needMenu ? api('/menu') : null,
     needSummary ? api('/reports/summary') : null,
+    needWa ? api('/settings/wa').catch(() => null) : null,
   ]);
   if (seq !== S.renderSeq) return '';
 
@@ -721,6 +724,7 @@ async function buildStaff(seq) {
   if (menu) data.menu = menu;
   if (summary) data.summary = summary;
   if (notifs) data.notifs = notifs;
+  if (wa) data.wa = wa;
   S.notifCount = notifs ? notifs.length : 0;
   S._ordersCache = orders;   // para pagos, WhatsApp y tickets
 
@@ -945,6 +949,7 @@ function encargadoView(tab, data) {
   if (tab === 'menu') return menuAdminView(data.menu, false);
   if (tab === 'mesas') return mesasQrView(data.tables, data.orders);
   if (tab === 'llamados') return llamadosView(data.notifs);
+  if (tab === 'avisos') return avisosView(data.wa);
   return '';
 }
 
@@ -1005,7 +1010,63 @@ async function duenoView(tab, data) {
   if (tab === 'menu') return menuAdminView(data.menu, true);
   if (tab === 'mesas') return mesasQrView(data.tables, data.orders);
   if (tab === 'personal') return personalView(await api('/users'));
+  if (tab === 'avisos') return avisosView(data.wa);
   return '';
+}
+
+/* ---------------- AVISOS POR WHATSAPP DEL NEGOCIO ---------------- */
+function avisosView(wa) {
+  if (!wa) {
+    return `<div class="section-title">📲 Avisos por WhatsApp</div>
+    <div class="empty"><span class="big">⚠️</span>No se pudo cargar la configuración de avisos. Recarga la página o revisa que el servidor esté actualizado.</div>`;
+  }
+  wa = wa || { enabled: true, configured: false, phone: '', apikeyMasked: '', last: null };
+  const last = wa.last;
+  const estado = last
+    ? (last.ok
+      ? `✅ Último aviso enviado ${ago(last.at)}.`
+      : `⚠️ El último intento falló ${ago(last.at)}: ${esc(last.error || 'sin detalle')}`)
+    : 'Aún no se ha enviado ningún aviso.';
+  const activo = wa.configured && wa.enabled;
+  return `<div class="section-title">📲 Avisos por WhatsApp</div>
+  <div class="card">
+    <div class="row">
+      <span class="chip ${activo ? 'pagado' : 'cancelado'}">${activo ? 'Activo' : (wa.enabled ? 'Falta configurar' : 'Pausado')}</span>
+      <span class="spacer"></span>
+      <button class="btn small ${wa.enabled ? 'secondary' : 'green'}" data-action="wa-toggle">
+        ${wa.enabled ? '⏸ Pausar avisos' : '▶️ Activar avisos'}
+      </button>
+    </div>
+    <p class="muted" style="margin-top:12px;line-height:1.5">
+      Cada pedido creado por un cliente llega automáticamente a este WhatsApp con:
+      número de pedido, mesa o para llevar, nombre, teléfono, productos, cantidades y total.
+    </p>
+    <div class="field" style="margin-top:16px">
+      <label>Número de WhatsApp del negocio *</label>
+      <input id="wa-phone" type="tel" inputmode="tel" placeholder="+58 424-1234567" value="${esc(wa.phone || '')}"/>
+      <div class="muted" style="margin-top:4px;font-size:12px">El número dedicado del negocio, con código de país.</div>
+    </div>
+    <div class="field">
+      <label>Clave de CallMeBot (apikey) *</label>
+      <input id="wa-key" type="text" autocomplete="off"
+        placeholder="${wa.apikeyMasked ? 'Guardada (' + esc(wa.apikeyMasked) + ') — deja vacío para conservarla' : 'Pega aquí la clave que te dio CallMeBot'}"/>
+    </div>
+    <div class="actions" style="flex-wrap:wrap">
+      <button class="btn secondary" data-action="wa-test">📤 Enviar prueba</button>
+      <button class="btn green" data-action="wa-save">💾 Guardar</button>
+    </div>
+    <div class="card" style="margin-top:16px;background:var(--bg-3)">
+      <strong>Cómo activarlo una sola vez</strong>
+      <ol class="muted" style="margin:10px 0 0 18px;line-height:1.6;font-size:13px">
+        <li>Desde el WhatsApp del negocio, envía este mensaje al <strong>+34 644 51 95 23</strong>:<br/>
+          <code>I allow callmebot to send me messages</code></li>
+        <li>El bot te responderá una <strong>apikey</strong>.</li>
+        <li>Escribe arriba tu número y pega la apikey, luego pulsa <strong>Guardar</strong>.</li>
+        <li>Pulsa <strong>Enviar prueba</strong> para confirmar que llega.</li>
+      </ol>
+      <p class="muted" style="margin-top:10px;font-size:12px">${estado}</p>
+    </div>
+  </div>`;
 }
 
 /* ---------------- MENÚ (admin) ---------------- */
@@ -1508,6 +1569,32 @@ async function act(action, el, ev) {
     /* ---- llamados ---- */
     case 'notif-done': {
       await api('/notifications/' + id, { method: 'DELETE' });
+      render();
+      break;
+    }
+
+    /* ---- avisos por WhatsApp del negocio ---- */
+    case 'wa-save': {
+      const phone = (document.getElementById('wa-phone')?.value || '').trim();
+      const apikey = (document.getElementById('wa-key')?.value || '').trim();
+      if (!phone) return toast('Escribe el número de WhatsApp del negocio', 'err');
+      const body = { phone, enabled: true };
+      if (apikey) body.apikey = apikey;
+      await api('/settings/wa', { method: 'POST', body });
+      toast('Avisos guardados ✅');
+      render();
+      break;
+    }
+    case 'wa-toggle': {
+      const wa = await api('/settings/wa');
+      await api('/settings/wa', { method: 'POST', body: { enabled: !wa.enabled } });
+      toast(wa.enabled ? 'Avisos pausados ⏸' : 'Avisos activados 📲');
+      render();
+      break;
+    }
+    case 'wa-test': {
+      await api('/settings/wa/test', { method: 'POST' });
+      toast('Prueba enviada 📲 Revisa el WhatsApp del negocio');
       render();
       break;
     }
