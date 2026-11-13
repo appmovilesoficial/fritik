@@ -125,6 +125,18 @@ function waMask_(value) {
   return s.slice(0, 2) + '••••' + s.slice(-3);
 }
 
+// CallMeBot responde en HTML: quitamos etiquetas y entidades para mostrarlo limpio.
+function waClean_(value) {
+  return String(value || '')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function waTextPedido_(order) {
   var lineas = [];
   lineas.push('🍭 *FRITIK — NUEVO PEDIDO #' + order.id + '*');
@@ -159,12 +171,12 @@ function waEnviar_(texto) {
   try {
     var res = UrlFetchApp.fetch(url, { muteHttpExceptions: true, followRedirects: true });
     var code = res.getResponseCode();
-    var body = String(res.getContentText() || '').trim();
+    var body = waClean_(res.getContentText());
     var ok = code >= 200 && code < 300 && !/error|invalid|not allowed|apikey/i.test(body);
     out = { ok: ok, at: Date.now(), code: code, detail: body.slice(0, 180) };
     if (!ok) out.error = body.slice(0, 180) || ('HTTP ' + code);
   } catch (e) {
-    out = { ok: false, at: Date.now(), error: String((e && e.message) || e).slice(0, 180) };
+    out = { ok: false, at: Date.now(), error: waClean_((e && e.message) || e).slice(0, 180) };
   }
   try { waProps_().setProperty(WA_LAST_KEY, JSON.stringify(out)); } catch (e2) { /* opcional */ }
   return out;
@@ -193,10 +205,13 @@ apiRoute_('GET', '/api/settings/wa', [minRank(4), function (req, res) {
 apiRoute_('POST', '/api/settings/wa', [minRank(4), function (req, res) {
   var b = req.body || {};
   var p = waProps_();
-  if (b.phone != null) p.setProperty(WA_PHONE_KEY, String(b.phone).trim());
-  if (b.apikey) p.setProperty(WA_APIKEY_KEY, String(b.apikey).trim());
-  if (b.clearApikey) p.deleteProperty(WA_APIKEY_KEY);
+  var cambio = false;
+  if (b.phone != null) { p.setProperty(WA_PHONE_KEY, String(b.phone).trim()); cambio = true; }
+  if (b.apikey) { p.setProperty(WA_APIKEY_KEY, String(b.apikey).trim()); cambio = true; }
+  if (b.clearApikey) { p.deleteProperty(WA_APIKEY_KEY); cambio = true; }
   if (b.enabled != null) p.setProperty(WA_ENABLED_KEY, b.enabled ? 'true' : 'false');
+  // Al cambiar la configuración, el resultado del último envío ya no aplica.
+  if (cambio) p.deleteProperty(WA_LAST_KEY);
   var cfg = waConfig_();
   res.json({
     ok: true,
