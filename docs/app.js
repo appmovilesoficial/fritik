@@ -17,6 +17,9 @@ const S = {
   poll: null,
   renderSeq: 0,
   lastHtml: null,
+  sound: localStorage.getItem('fritik_sound') !== '0', // campana activada por defecto
+  seenOrders: null,   // Map id → estado, para detectar pedidos nuevos y cambios
+  seenNotifs: null,   // Set de ids de llamados ya avisados
 };
 
 /* ---------------- Moneda: $ (principal) + Bs. con tasa oficial del BCV ---------------- */
@@ -272,12 +275,14 @@ function makeQrSvg(text) {
 
 function saveSession(token, user, table = null) {
   S.token = token; S.user = user; S.table = table;
+  S.seenOrders = null; S.seenNotifs = null; S.lastHtml = null;
   localStorage.setItem('fritik_token', token);
 }
 
 function clearSession() {
   S.token = null; S.user = null; S.table = null; S.cart = [];
   S.orderType = null; S.customerName = '';
+  S.seenOrders = null; S.seenNotifs = null; S.lastHtml = null;
   localStorage.removeItem('fritik_token');
 }
 
@@ -302,6 +307,290 @@ function closeModal() {
   const root = document.getElementById('modal-root');
   if (root) root.innerHTML = '';
 }
+
+/* ============================================================
+   AVISOS SONOROS Y VISUALES (sin depender de otra app)
+   - Sonido: campana sintetizada con Web Audio (no usa archivos).
+   - Visual: tarjeta flotante + título de la pestaña parpadeando.
+   - Navegador: notificación del sistema si la pestaña está oculta.
+   - Cada perfil recibe solo lo que le corresponde.
+   ============================================================ */
+const BASE_TITLE = document.title;
+const ALERT_ICON = { pedido: '🍭', listo: '✅', cuenta: '🧾', llamado: '🔔' };
+const SOUND_NOTES = {
+  pedido: [[784, 0], [1046, 0.16], [1318, 0.32]],
+  listo: [[1046, 0], [1318, 0.14]],
+  cuenta: [[880, 0], [1174, 0.16]],
+  llamado: [[988, 0], [1318, 0.15], [988, 0.3], [1318, 0.45]],
+};
+
+let AC = null; // AudioContext: los navegadores solo dejan sonar tras un toque del usuario
+let titleTimer = null;
+let swReady = null;
+
+if ('serviceWorker' in navigator) {
+  // Sin caché: solo se usa para mostrar notificaciones del sistema en el móvil.
+  swReady = navigator.serviceWorker.register('sw.js').catch(() => null);
+}
+
+function audioCtx() {
+  const Ctor = window.AudioContext || window.webkitAudioContext;
+  if (!Ctor) return null;
+  if (!AC) { try { AC = new Ctor(); } catch (e) { return null; } }
+  if (AC.state === 'suspended') AC.resume().catch(() => {});
+  return AC;
+}
+
+['pointerdown', 'keydown'].forEach(ev => document.addEventListener(ev, () => {
+  if (!AC || AC.state !== 'running') audioCtx();
+}, true));
+
+function chime(tipo) {
+  if (!S.sound) return;
+  const ctx = audioCtx();
+  if (!ctx) return;
+  const t0 = ctx.currentTime + 0.03;
+  (SOUND_NOTES[tipo] || SOUND_NOTES.pedido).forEach(([freq, at]) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, t0 + at);
+    gain.gain.setValueAtTime(0.0001, t0 + at);
+    gain.gain.exponentialRampToValueAtTime(0.22, t0 + at + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + at + 0.38);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(t0 + at);
+    osc.stop(t0 + at + 0.42);
+  });
+}
+
+function canNotify() {
+  return 'Notification' in window && Notification.permission === 'granted';
+}
+
+function osNotify(titulo, detalle, tag) {
+  if (!document.hidden || !canNotify()) return; // con la pestaña visible basta la tarjeta
+  const title = 'Fritik · ' + titulo;
+  const opts = { body: detalle || '', tag: tag || 'fritik', icon: 'assets/favicon.png', badge: 'assets/favicon.png' };
+  const viaPage = () => {
+    try {
+      const n = new Notification(title, opts);
+      n.onclick = () => { try { window.focus(); n.close(); } catch (e) {} };
+    } catch (e) { /* móviles: solo permiten notificar desde el service worker */ }
+  };
+  const viaSw = () => {
+    if (!swReady) return viaPage();
+    swReady
+      .then(reg => (reg && navigator.serviceWorker.controller
+        ? reg.showNotification(title, opts).catch(viaPage)
+        : viaPage()))
+      .catch(viaPage);
+  };
+  viaSw();
+}
+
+function flashTitle(titulo) {
+  if (!document.hidden) return;
+  clearInterval(titleTimer);
+  let on = false;
+  titleTimer = setInterval(() => {
+    document.title = (on = !on) ? '🔴 ' + titulo : BASE_TITLE;
+  }, 1100);
+  const stop = () => {
+    clearInterval(titleTimer);
+    titleTimer = null;
+    document.title = BASE_TITLE;
+    document.removeEventListener('visibilitychange', onVis);
+    window.removeEventListener('focus', stop);
+  };
+  const onVis = () => { if (!document.hidden) stop(); };
+  document.addEventListener('visibilitychange', onVis);
+  window.addEventListener('focus', stop);
+}
+
+function alerta(tipo, titulo, detalle, tab, conSonido = true) {
+  let layer = document.getElementById('alert-layer');
+  if (!layer) {
+    layer = document.createElement('div');
+    layer.id = 'alert-layer';
+    document.body.appendChild(layer);
+  }
+
+  const el = document.createElement('div');
+  el.className = 'alert-card ' + tipo;
+  el.innerHTML = `<span class="alert-icon">${ALERT_ICON[tipo] || '🔔'}</span>
+    <span class="alert-text"><strong>${esc(titulo)}</strong>${detalle ? `<span>${esc(detalle)}</span>` : ''}</span>
+    ${tab ? '<button class="btn small" data-alert-go>Ver</button>' : ''}
+    <button class="alert-close" aria-label="Cerrar aviso">✕</button>`;
+
+  el.querySelector('.alert-close').onclick = () => el.remove();
+  const go = el.querySelector('[data-alert-go]');
+  if (go) {
+    go.onclick = () => {
+      if (tab) {
+        S.tab = tab;
+        if (S.user && S.user.role !== 'cliente' && location.hash !== '#/app') location.hash = '#/app';
+        render().catch(() => {});
+      }
+      el.remove();
+    };
+  }
+
+  layer.prepend(el);
+  while (layer.children.length > 3) layer.lastElementChild.remove();
+  setTimeout(() => {
+    el.classList.add('out');
+    setTimeout(() => el.remove(), 320);
+  }, 15000);
+
+  if (conSonido) chime(tipo);
+  osNotify(titulo, detalle, tipo);
+  flashTitle(titulo);
+}
+
+// Compara lo que se acaba de cargar con lo ya visto y genera los avisos del perfil.
+function checkAlerts(role, orders, notifs) {
+  const primera = !S.seenOrders;
+  const antesO = S.seenOrders || new Map();
+  const antesN = S.seenNotifs || new Set();
+  const ahoraO = new Map();
+  const ahoraN = new Set();
+
+  const nuevos = [];
+  const listos = [];
+  const mios = [];
+  const cuentas = new Map();   // número de mesa → ya avisada
+  const llamados = new Map();
+
+  (orders || []).forEach(o => {
+    const prev = antesO.get(o.id);
+    ahoraO.set(o.id, o.status);
+    if (prev === o.status) return;
+    // Si el último cambio lo hizo este mismo usuario, no se avisa a sí mismo.
+    const hist = Array.isArray(o.history) && o.history.length ? o.history[o.history.length - 1] : null;
+    const porMi = !!(hist && S.user && hist.by === S.user.name);
+
+    if (role === 'cliente') {
+      if (prev && o.status === 'listo') mios.push(o);
+      return;
+    }
+    if (!prev) {
+      const propio = o.createdById && S.user && o.createdById === S.user.id;
+      if (!primera && !propio && ['mesero', 'cocinero', 'encargado', 'dueno'].includes(role)) nuevos.push(o);
+      return;
+    }
+    if (o.status === 'listo' && !porMi && ['mesero', 'encargado', 'dueno'].includes(role)) listos.push(o);
+    if (o.status === 'por_pagar' && !porMi && ['cajero', 'encargado', 'dueno'].includes(role) && o.tableNumber) {
+      cuentas.set(o.tableNumber, true);
+    }
+  });
+
+  (notifs || []).forEach(n => {
+    ahoraN.add(n.id);
+    if (primera || antesN.has(n.id) || !n.tableNumber) return;
+    if (n.type === 'bill') {
+      // El cambio a "por pagar" ya avisa a caja; aquí solo si el mesero lo pide.
+      if (role === 'mesero') cuentas.set(n.tableNumber, true);
+      return;
+    }
+    if (['mesero', 'encargado', 'dueno'].includes(role)) llamados.set(n.tableNumber, true);
+  });
+
+  S.seenOrders = ahoraO;
+  S.seenNotifs = ahoraN;
+  if (primera) return; // la primera carga solo toma la foto inicial, sin sonar
+
+  const avisos = [];
+  const lugar = o => (o.orderType === 'llevar' ? 'Para llevar' : 'Mesa ' + o.tableNumber);
+  const uniq = arr => arr.filter((v, i) => arr.indexOf(v) === i);
+  const recorte = (arr, max) => arr.slice(0, max).join(' · ') + (arr.length > max ? ' +' + (arr.length - max) : '');
+  // Si el perfil no tiene esa pestaña (p. ej. el dueño no tiene "cobrar"),
+  // el botón "Ver" lleva a la pestaña más cercana que sí exista.
+  const tabSeguro = (deseada) => {
+    const tabs = (TABS[role] || []).map(([id]) => id);
+    if (tabs.includes(deseada)) return deseada;
+    if (tabs.includes('pedidos')) return 'pedidos';
+    return tabs[0] || deseada;
+  };
+
+  if (nuevos.length) {
+    const lugares = uniq(nuevos.map(lugar));
+    avisos.push(['pedido',
+      nuevos.length === 1 ? `Nuevo pedido #${nuevos[0].id}` : `${nuevos.length} pedidos nuevos`,
+      `${recorte(lugares, 3)} · ${money(nuevos.reduce((s, o) => s + (o.total || 0), 0))}`,
+      tabSeguro('pedidos')]);
+  }
+  if (listos.length) {
+    const lugares = uniq(listos.map(lugar));
+    avisos.push(['listo',
+      listos.length === 1 ? `Pedido #${listos[0].id} listo` : `${listos.length} pedidos listos`,
+      'Para servir: ' + recorte(lugares, 3),
+      tabSeguro('pedidos')]);
+  }
+  if (cuentas.size) {
+    const mesas = [...cuentas.keys()];
+    avisos.push(['cuenta',
+      mesas.length === 1 ? `Mesa ${mesas[0]} pidió la cuenta` : `${mesas.length} mesas piden la cuenta`,
+      mesas.length === 1 ? 'Cobrar en caja' : 'Mesas ' + recorte(mesas, 4),
+      tabSeguro('cobrar')]);
+  }
+  if (llamados.size) {
+    const mesas = [...llamados.keys()];
+    avisos.push(['llamado',
+      mesas.length === 1 ? `Mesa ${mesas[0]} llama al vendedor` : `${mesas.length} llamados pendientes`,
+      mesas.length === 1 ? 'Atender el llamado' : 'Mesas ' + recorte(mesas, 4),
+      tabSeguro('llamados')]);
+  }
+  mios.forEach(o => avisos.push(['listo',
+    `Tu pedido #${o.id} está listo 🍭`,
+    o.orderType === 'llevar' ? 'Pasa por el mostrador' : `Servido en la mesa ${o.tableNumber}`,
+    tabSeguro('pedido')]));
+
+  // Un solo sonido por tanda y máximo 4 tarjetas, para no aturdir.
+  avisos.slice(0, 4).forEach(([tipo, titulo, detalle, tab], i) =>
+    alerta(tipo, titulo, detalle, tab, i === 0));
+}
+
+function notifyModal() {
+  const perm = 'Notification' in window ? Notification.permission : 'unsupported';
+  const estado = perm === 'granted'
+    ? '<span class="chip libre">✅ Activados</span>'
+    : perm === 'denied'
+      ? '<span class="chip cancelado">Bloqueados</span>'
+      : perm === 'unsupported'
+        ? '<span class="chip cancelado">No disponible</span>'
+        : '<button class="btn small" data-action="notify-permission">Activar</button>';
+  const nota = perm === 'denied'
+    ? '<p class="muted">El navegador los bloqueó. Ábrelos en el candado de la barra de direcciones → Notificaciones → Permitir.</p>'
+    : (perm === 'granted'
+      ? '<p class="muted">Llegan aunque estés en otra pestaña o con la app minimizada. El teléfono debe tener sonido activado.</p>'
+      : '<p class="muted">El navegador pedirá permiso una sola vez. Si usas iPhone, añade la web a la pantalla de inicio.</p>');
+
+  openModal(`<h2>🔔 Avisos y sonido</h2>
+    <p class="muted">Cada perfil recibe solo sus avisos: pedidos nuevos, pedidos listos, llamados de mesa y cuentas por cobrar.</p>
+    <div class="card" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px">
+      <div><strong>Sonido del panel</strong><br><span class="muted">Campana al llegar un aviso.</span></div>
+      <button class="btn small ${S.sound ? 'green' : 'secondary'}" data-action="sound-toggle">${S.sound ? '🔊 Activado' : '🔕 Silenciado'}</button>
+    </div>
+    <div class="card" style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+      <div><strong>Avisos del navegador</strong><br><span class="muted">Para verlos con la pestaña en segundo plano.</span></div>
+      ${estado}
+    </div>
+    ${nota}
+    <div class="actions">
+      <button class="btn secondary" data-action="close-modal">Cerrar</button>
+      <button class="btn" data-action="notify-test">🔔 Probar aviso</button>
+    </div>`, true);
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) {
+    clearInterval(titleTimer);
+    titleTimer = null;
+    document.title = BASE_TITLE;
+  }
+});
 const chip = st => `<span class="chip ${st}">${STATUS_LABEL[st] || st}</span>`;
 
 /* ---------------- Router ---------------- */
@@ -458,6 +747,7 @@ function topbar() {
       <span>${esc(S.user.name)}</span>
       <span class="badge ${S.user.role}">${ROLE_LABEL[S.user.role]}</span>
       ${notifBadge}
+      <button class="btn small secondary bell" data-action="notify-settings" title="Avisos y sonido" aria-label="Avisos y sonido">${S.sound ? '🔔' : '🔕'}</button>
       ${S.user.role === 'cliente' ? '' : '<button class="btn small secondary" data-action="logout">Salir</button>'}
     </div>
   </div>${rateBar()}`;
@@ -501,13 +791,12 @@ function syncCart() {
 }
 
 async function buildCliente(seq) {
-  // Solo se piden los datos que la pestaña necesita, y en paralelo
-  const [menu, orders] = await Promise.all([
-    api('/menu'),
-    S.tab === 'pedido' ? api('/orders') : Promise.resolve([]),
-  ]);
+  // El menú y los pedidos se piden siempre: los pedidos permiten avisar
+  // al cliente cuando su pedido está listo, aunque esté en otra pestaña.
+  const [menu, orders] = await Promise.all([api('/menu'), api('/orders')]);
   if (seq !== S.renderSeq) return '';
   S.menu = menu;
+  checkAlerts('cliente', orders, null);
 
   if (!S.table && S.tab === 'mesa') S.tab = 'menu';
   const tabs = S.table ? TABS.cliente : TABS.cliente.filter(([id]) => id !== 'mesa');
@@ -727,6 +1016,7 @@ async function buildStaff(seq) {
   if (wa) data.wa = wa;
   S.notifCount = notifs ? notifs.length : 0;
   S._ordersCache = orders;   // para pagos, WhatsApp y tickets
+  checkAlerts(role, orders, notifs);
 
   let body = '';
   switch (role) {
@@ -1277,6 +1567,35 @@ async function act(action, el, ev) {
       break;
     }
 
+    /* ---- avisos ---- */
+    case 'notify-settings': notifyModal(); break;
+    case 'sound-toggle': {
+      S.sound = !S.sound;
+      localStorage.setItem('fritik_sound', S.sound ? '1' : '0');
+      if (S.sound) chime('listo');
+      notifyModal();
+      render();
+      break;
+    }
+    case 'notify-permission': {
+      if (!('Notification' in window)) { toast('Este navegador no permite avisos del sistema', 'err'); break; }
+      const perm = await Notification.requestPermission();
+      toast(perm === 'granted' ? '🔔 Avisos del navegador activados' : 'No se activaron los avisos del navegador', perm === 'granted' ? 'ok' : 'err');
+      notifyModal();
+      break;
+    }
+    case 'notify-test': {
+      chime('pedido');
+      if (canNotify() && !document.hidden) {
+        try {
+          const n = new Notification('Fritik · Prueba de aviso', { body: 'Así llegarán los pedidos 🍭', icon: 'assets/favicon.png', tag: 'prueba' });
+          n.onclick = () => { try { window.focus(); n.close(); } catch (e) {} };
+        } catch (e) { /* en móvil solo funciona desde el service worker */ }
+      }
+      alerta('pedido', 'Prueba de aviso', 'Sonido y tarjeta funcionando 🍭', S.tab, false);
+      break;
+    }
+
     /* ---- navegación ---- */
     case 'tab': S.tab = el.dataset.tab; render(); break;
     case 'go-carta': location.hash = '#/carta'; break;
@@ -1649,17 +1968,37 @@ document.addEventListener('change', async e => {
   } catch (err) { toast(err.message, 'err'); }
 });
 
+let lastPoll = 0;
+
 function startPoll() {
   stopPoll();
+  lastPoll = 0;
+  // Cada 2 s se comprueba si toca consultar: 10 s con la pestaña visible y
+  // 25 s en segundo plano, que es justo cuando hacen falta los avisos.
   S.poll = setInterval(() => {
-    if (document.hidden) return;                   // pestaña en segundo plano: no gastar cuota
-    if (S.modalOpen) return;                       // no interrumpir modales
+    const cada = document.hidden ? 25000 : 10000;
+    if (Date.now() - lastPoll < cada) return;
     const tag = document.activeElement?.tagName;
     if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag)) return; // no interrumpir escritura
+    lastPoll = Date.now();
     render().catch(() => {});
-  }, 15000);
+  }, 2000);
+  document.addEventListener('visibilitychange', pollNow);
+  window.addEventListener('focus', pollNow);
 }
-function stopPoll() { if (S.poll) clearInterval(S.poll); S.poll = null; }
+
+function pollNow() {
+  if (!S.poll || document.hidden) return;
+  lastPoll = Date.now();
+  render().catch(() => {});
+}
+
+function stopPoll() {
+  if (S.poll) clearInterval(S.poll);
+  S.poll = null;
+  document.removeEventListener('visibilitychange', pollNow);
+  window.removeEventListener('focus', pollNow);
+}
 
 window.addEventListener('hashchange', () => route().catch(e => toast(e.message, 'err')));
 

@@ -307,6 +307,36 @@ table.data tr:last-child td { border-bottom: none; }
 .qr-card svg { width: 100%; max-width: 220px; height: auto; background: #fff; border-radius: 12px; padding: 8px; }
 .qr-card .url { font-size: 11px; color: var(--muted); word-break: break-all; margin-top: 8px; }
 
+/* ---------- Avisos flotantes (pedidos, llamados, cuentas) ---------- */
+#alert-layer {
+  position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
+  z-index: 100; display: flex; flex-direction: column; gap: 8px;
+  width: min(540px, calc(100vw - 24px)); pointer-events: none;
+}
+.alert-card {
+  pointer-events: auto; display: flex; align-items: center; gap: 10px;
+  padding: 12px 14px; border-radius: 16px; background: var(--card);
+  border: 2px solid var(--accent); box-shadow: 0 14px 34px rgba(70, 38, 17, .28);
+  animation: alertIn .28s ease-out;
+}
+.alert-card.pedido { border-color: var(--accent); }
+.alert-card.llamado { border-color: #f4a300; }
+.alert-card.listo { border-color: var(--green); }
+.alert-card.cuenta { border-color: #7a4bd1; }
+.alert-card.out { animation: alertOut .3s ease-in forwards; }
+.alert-icon { font-size: 24px; line-height: 1; }
+.alert-text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.alert-text strong { font-size: 14px; color: var(--text); line-height: 1.25; }
+.alert-text span { font-size: 12px; color: var(--muted); }
+.alert-close {
+  border: 0; background: transparent; color: var(--muted); font-size: 14px;
+  cursor: pointer; padding: 6px; border-radius: 8px; line-height: 1;
+}
+.alert-close:hover { background: var(--bg-2); color: var(--text); }
+.bell { font-size: 15px; line-height: 1; padding: 7px 10px; }
+@keyframes alertIn { from { opacity: 0; transform: translateY(-14px) scale(.98); } to { opacity: 1; transform: none; } }
+@keyframes alertOut { to { opacity: 0; transform: translateY(-10px) scale(.98); } }
+
 /* ---------- Modal ---------- */
 .modal-backdrop {
   position: fixed; inset: 0; background: rgba(70, 38, 17, .55); z-index: 60;

@@ -104,6 +104,35 @@ pedido igual se registra.
 
 El cliente no ve el botón **Salir** ni la pantalla de login del personal.
 
+## Avisos sonoros y visuales en el panel
+
+Cada perfil con sesión abierta recibe avisos en el propio navegador, sin
+depender de otra app:
+
+- **Sonido** de campana (Web Audio, sin archivos) al llegar un aviso.
+- **Tarjeta flotante** con botón **Ver** que abre la pestaña correspondiente.
+- **Título de la pestaña** parpadeando mientras está en segundo plano.
+- **Notificación del sistema** si se concede el permiso (móvil y escritorio).
+
+Qué recibe cada perfil:
+
+| Perfil | Avisos |
+| --- | --- |
+| Vendedor (mesero) | pedidos nuevos, pedidos listos, llamados y cuentas |
+| Preparador (cocinero) | pedidos nuevos |
+| Cajero | mesas que piden la cuenta |
+| Encargado / Dueño | todo: pedidos nuevos, listos, llamados y cuentas |
+| Cliente | su pedido cuando está listo |
+
+El botón 🔔 de la barra superior abre **Avisos y sonido**, donde se activa o
+silencia la campana y se concede el permiso del navegador. El panel consulta
+cada 10 s con la pestaña visible y cada 25 s en segundo plano (los móviles
+pueden espaciarlo más). Para que suene, el teléfono no debe estar en silencio.
+
+`docs/sw.js` es un service worker mínimo, sin caché, que solo permite mostrar
+las notificaciones del sistema en Android; en iPhone hay que añadir la web a la
+pantalla de inicio para recibirlas con la app cerrada.
+
 ## Carta
 
 La especialidad abre la carta: **Churros** (10 productos, marcados como
