@@ -583,13 +583,20 @@ apiRoute_('POST', '/api/orders/:id/pay', [auth, requireRole('cajero', 'encargado
 
   var b = req.body || {};
   var total = totalOf(order);
+  var method = ['efectivo', 'tarjeta', 'transferencia', 'qr'].indexOf(b.method) !== -1 ? b.method : 'efectivo';
+  var reference = String(b.reference == null ? '' : b.reference).trim();
+  // El pago móvil / QR exige el número de referencia de 4 dígitos.
+  if (method === 'qr' && !/^\d{4}$/.test(reference)) {
+    return res.status(400).json({ error: 'El pago móvil requiere un número de referencia de 4 dígitos' });
+  }
   var paid = {
-    method: ['efectivo', 'tarjeta', 'transferencia', 'qr'].indexOf(b.method) !== -1 ? b.method : 'efectivo',
+    method: method,
     amount: total,
     received: b.amount != null ? Number(b.amount) : total,
     at: Date.now(),
     by: req.user.name,
   };
+  if (method === 'qr') paid.reference = reference;
   order.payments.push(paid);
   order.status = 'pagado';
   order.history.push({ status: 'pagado', at: Date.now(), by: req.user.name });
@@ -725,7 +732,15 @@ apiRoute_('GET', '/api/reports/summary', [auth, soloReportes, function (req, res
     return o.payments.some(function (p) { return p.at >= startOfDay.getTime(); });
   });
 
+  var startOfMonth = new Date();
+  startOfMonth.setDate(1);
+  startOfMonth.setHours(0, 0, 0, 0);
+  var monthOrders = paid.filter(function (o) {
+    return o.payments.some(function (p) { return p.at >= startOfMonth.getTime(); });
+  });
+
   var salesToday = today.reduce(function (s, o) { return s + totalOf(o); }, 0);
+  var salesMonth = monthOrders.reduce(function (s, o) { return s + totalOf(o); }, 0);
   var salesAll = paid.reduce(function (s, o) { return s + totalOf(o); }, 0);
 
   var byMethod = {};
@@ -754,8 +769,10 @@ apiRoute_('GET', '/api/reports/summary', [auth, soloReportes, function (req, res
 
   res.json({
     salesToday: salesToday,
+    salesMonth: salesMonth,
     salesAll: salesAll,
     ordersToday: today.length,
+    ordersMonth: monthOrders.length,
     ordersTotal: paid.length,
     avgTicket: today.length ? salesToday / today.length : 0,
     byMethod: byMethod,

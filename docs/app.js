@@ -798,6 +798,7 @@ const TABS = {
   cajero: [['cobrar', '💰 Por cobrar'], ['cobrados', '✅ Cobrados']],
   encargado: [
     ['resumen', '📊 Resumen'],
+    ['reportes', '📈 Reportes'],
     ['mesas', '🪑 Mesas y QR'],
     ['pedidos', '🧾 Pedidos'],
     ['cocina', '🍭 Preparación'],
@@ -1103,7 +1104,7 @@ async function buildStaff(seq) {
   const needNotifs = isStaff;
   const needMenu = isAdmin && tab === 'menu';
   const needWa = isAdmin && tab === 'avisos';
-  const needSummary = (role === 'encargado' && tab === 'resumen')
+  const needSummary = (role === 'encargado' && ['resumen', 'reportes'].includes(tab))
     || (role === 'dueno' && ['dashboard', 'reportes'].includes(tab));
 
   const [tables, orders, notifs, menu, summary, wa] = await Promise.all([
@@ -1272,7 +1273,7 @@ function cajeroView(tab, data) {
     ${today.length ? `<div class="card"><table class="data">        <tr><th>#</th><th>Mesa</th><th>Método</th><th>Hora</th><th>Total</th><th></th></tr>
       ${today.map(o => `<tr>
         <td>${o.id}</td><td>${o.orderType === 'llevar' ? 'Llevar' : o.tableNumber}</td>
-        <td>${o.payments.map(p => p.method).join(', ')}</td>
+        <td>${o.payments.map(p => p.method + (p.reference ? ' · Ref. ' + esc(p.reference) : '')).join(', ')}</td>
         <td>${new Date(o.payments[o.payments.length - 1].at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</td>
         <td><strong>${price(o.total)}</strong></td>
         <td>${waBoton(o)}</td>
@@ -1325,6 +1326,11 @@ function payModal(orderId) {
       <input id="pay-amount" type="number" min="0" step="0.01" value="${o.total.toFixed(2)}"/>
       <div class="muted" id="change-line" style="margin-top:6px"></div>
     </div>
+    <div class="field" id="qr-field" style="display:none">
+      <label>Número de referencia del pago móvil</label>
+      <input id="pay-reference" type="text" inputmode="numeric" autocomplete="off" maxlength="4" placeholder="4 dígitos"/>
+      <div class="muted" style="margin-top:6px">Obligatorio: los 4 dígitos que muestra el banco al confirmar el pago.</div>
+    </div>
     <div class="actions">
       <button class="btn secondary" data-action="close-modal">Cancelar</button>
       <button class="btn green" data-action="confirm-pay" data-id="${o.id}">✅ Confirmar pago</button>
@@ -1336,14 +1342,26 @@ function payModal(orderId) {
       v >= o.total ? `Cambio: ${price(v - o.total)}` : `Faltan ${price(o.total - v)}`;
   };
   amt.addEventListener('input', upd); upd();
-  document.getElementById('pay-method').addEventListener('change', e => {
-    document.getElementById('cash-field').style.display = e.target.value === 'efectivo' ? '' : 'none';
+  const methodSel = document.getElementById('pay-method');
+  const cashField = document.getElementById('cash-field');
+  const qrField = document.getElementById('qr-field');
+  const refInput = document.getElementById('pay-reference');
+  const syncFields = () => {
+    const m = methodSel.value;
+    cashField.style.display = m === 'efectivo' ? '' : 'none';
+    qrField.style.display = m === 'qr' ? '' : 'none';
+  };
+  methodSel.addEventListener('change', syncFields);
+  syncFields();
+  refInput.addEventListener('input', () => {
+    refInput.value = refInput.value.replace(/\D/g, '').slice(0, 4);
   });
 }
 
 /* ---------------- ENCARGADO ---------------- */
 function encargadoView(tab, data) {
   if (tab === 'resumen') return resumenView(data.summary, false);
+  if (tab === 'reportes') return reportesView(data.summary);
   if (tab === 'pedidos') return pedidosView(data.orders, true);
   if (tab === 'cocina') return cocineroView(data);
   if (tab === 'cobrar' || tab === 'cobrados') return cajeroView(tab, data);
@@ -1369,6 +1387,35 @@ function resumenView(s, full) {
   </div>`;
 }
 
+function reportesView(r) {
+  if (!r) return '<div class="empty"><span class="big">📈</span>No se pudieron cargar los reportes.</div>';
+  const maxH = Math.max(...r.byHour, 1);
+  const ventasMes = r.salesMonth != null ? r.salesMonth : r.salesAll;
+  return `<div class="grid cols-4">
+    <div class="card stat"><div class="value">${price(r.salesToday)}</div><div class="label">Ventas hoy</div></div>
+    <div class="card stat"><div class="value">${price(ventasMes)}</div><div class="label">Ventas del mes</div></div>
+    <div class="card stat"><div class="value">${r.ordersToday}</div><div class="label">Pedidos hoy</div></div>
+    <div class="card stat"><div class="value">${price(r.avgTicket)}</div><div class="label">Ticket promedio</div></div>
+  </div>
+  <div class="section-title">Ventas por método de pago</div>
+  <div class="card"><table class="data">
+    <tr><th>Método</th><th>Total</th></tr>
+    ${Object.entries(r.byMethod).map(([m, v]) => `<tr><td>${esc(m)}</td><td>${price(v)}</td></tr>`).join('') || '<tr><td colspan="2" class="muted">Sin datos</td></tr>'}
+  </table></div>
+  <div class="section-title">Ventas por hora (hoy)</div>
+  <div class="card">
+    <div style="display:flex;align-items:flex-end;gap:4px;height:140px">
+      ${r.byHour.map((v, h) => `<div title="${h}:00 — ${money(v)}" style="flex:1;height:${Math.max(3, (v / maxH) * 100)}%;background:${v ? 'var(--accent)' : 'var(--bg-3)'};border-radius:4px 4px 0 0"></div>`).join('')}
+    </div>
+    <div class="muted" style="display:flex;justify-content:space-between;margin-top:6px"><span>0h</span><span>12h</span><span>23h</span></div>
+  </div>
+  <div class="section-title">🏆 Top 5 productos</div>
+  <div class="card"><table class="data">
+    <tr><th>Producto</th><th>Vendidos</th><th>Ingresos</th></tr>
+    ${r.topProducts.map(p => `<tr><td>${esc(p.name)}</td><td>${p.qty}</td><td>${price(p.revenue)}</td></tr>`).join('') || '<tr><td colspan="3" class="muted">Sin ventas aún</td></tr>'}
+  </table></div>`;
+}
+
 /* ---------------- DUEÑO ---------------- */
 async function duenoView(tab, data) {
   if (tab === 'dashboard') {
@@ -1382,30 +1429,7 @@ async function duenoView(tab, data) {
   }
   if (tab === 'reportes') {
     const r = data.summary || await api('/reports/summary');
-    const maxH = Math.max(...r.byHour, 1);
-    return `<div class="grid cols-4">
-      <div class="card stat"><div class="value">${price(r.salesToday)}</div><div class="label">Ventas hoy</div></div>
-      <div class="card stat"><div class="value">${price(r.salesAll)}</div><div class="label">Ventas históricas</div></div>
-      <div class="card stat"><div class="value">${r.ordersToday}</div><div class="label">Pedidos hoy</div></div>
-      <div class="card stat"><div class="value">${price(r.avgTicket)}</div><div class="label">Ticket promedio</div></div>
-    </div>
-    <div class="section-title">Ventas por método de pago</div>
-    <div class="card"><table class="data">
-      <tr><th>Método</th><th>Total</th></tr>
-      ${Object.entries(r.byMethod).map(([m, v]) => `<tr><td>${esc(m)}</td><td>${price(v)}</td></tr>`).join('') || '<tr><td colspan="2" class="muted">Sin datos</td></tr>'}
-    </table></div>
-    <div class="section-title">Ventas por hora (hoy)</div>
-    <div class="card">
-      <div style="display:flex;align-items:flex-end;gap:4px;height:140px">
-        ${r.byHour.map((v, h) => `<div title="${h}:00 — ${money(v)}" style="flex:1;height:${Math.max(3, (v / maxH) * 100)}%;background:${v ? 'var(--accent)' : 'var(--bg-3)'};border-radius:4px 4px 0 0"></div>`).join('')}
-      </div>
-      <div class="muted" style="display:flex;justify-content:space-between;margin-top:6px"><span>0h</span><span>12h</span><span>23h</span></div>
-    </div>
-    <div class="section-title">🏆 Top 5 productos</div>
-    <div class="card"><table class="data">
-      <tr><th>Producto</th><th>Vendidos</th><th>Ingresos</th></tr>
-      ${r.topProducts.map(p => `<tr><td>${esc(p.name)}</td><td>${p.qty}</td><td>${price(p.revenue)}</td></tr>`).join('') || '<tr><td colspan="3" class="muted">Sin ventas aún</td></tr>'}
-    </table></div>`;
+    return reportesView(r);
   }
   if (tab === 'pedidos') return pedidosView(data.orders, false);
   if (tab === 'menu') return menuAdminView(data.menu, true);
@@ -1892,7 +1916,14 @@ async function act(action, el, ev) {
     case 'confirm-pay': {
       const method = document.getElementById('pay-method')?.value || 'efectivo';
       const amount = Number(document.getElementById('pay-amount')?.value || 0);
-      await api(`/orders/${id}/pay`, { method: 'POST', body: { method, amount } });
+      const refInput = document.getElementById('pay-reference');
+      const reference = method === 'qr' ? (refInput?.value || '').trim() : '';
+      if (method === 'qr' && !/^\d{4}$/.test(reference)) {
+        toast('Escribe el número de referencia de 4 dígitos del pago móvil', 'err');
+        if (refInput) refInput.focus();
+        return;
+      }
+      await api(`/orders/${id}/pay`, { method: 'POST', body: { method, amount, reference } });
       closeModal();
       toast('Pago confirmado ✓');
       render();

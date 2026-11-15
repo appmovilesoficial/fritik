@@ -55,8 +55,8 @@ Los clientes no inician sesión: escanean el QR de su mesa o piden para llevar
 desde la carta.
 
 El perfil **encargado** puede operar todas las áreas: ventas y mesas,
-preparación (cocina), cobros y caja, menú, llamados y resumen. Los accesos
-rápidos de prueba ya no se muestran en la pantalla de login.
+preparación (cocina), cobros y caja, menú, llamados, resumen y **📈 Reportes**.
+Los accesos rápidos de prueba ya no se muestran en la pantalla de login.
 
 Como **mesero**, el encargado puede abrir cualquier mesa desde **🪑 Mesas y QR**
 o la pestaña **🧾 Pedidos** y marcar el pedido como **✅ Entregado** cuando la
@@ -65,6 +65,16 @@ con el botón **💵 Cobrar** de cada pedido (también aparece en el detalle de 
 mesa); al confirmar el pago, el pedido queda **pagado**, se registra el método
 de pago y la mesa se libera si no tiene otros pedidos abiertos. El **dueño**
 tiene las mismas acciones.
+
+Al cobrar con **QR / pago móvil** es obligatorio registrar el **número de
+referencia de 4 dígitos** que muestra el banco: el campo aparece solo al elegir
+ese método y el pago no se confirma sin él (el backend también lo valida). La
+referencia se guarda con el pago y se muestra en **✅ Cobrados**.
+
+La pestaña **📈 Reportes** (dueño y encargado) muestra las ventas de hoy, las
+**ventas del mes en curso**, los pedidos de hoy, el ticket promedio, el desglose
+por método de pago, las ventas por hora y el top 5 de productos. La tarjeta
+**Ventas del mes** solo cuenta los pagos recibidos desde el día 1 del mes.
 
 Los precios se muestran en dólares (**$**) y su equivalente en bolívares con
 la **tasa oficial del dólar del BCV**, consultada desde
