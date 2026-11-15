@@ -175,6 +175,10 @@ cambiar la sesión `default` de clasp (la de Chilokos). Copia la nueva URL
 
 Repositorio: `https://github.com/appmovilesoficial/fritik`
 
+La cuenta de GitHub dueña del repositorio y de la web es **`appmovilesoficial`**
+(cuenta personal con permisos de administración). No hace falta transferir el
+repositorio: los QR y la dirección publicada ya apuntan a esa cuenta.
+
 GitHub Pages (rama `main`, carpeta `/docs`):
 
 `https://appmovilesoficial.github.io/fritik`
