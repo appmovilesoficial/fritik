@@ -1068,6 +1068,7 @@ function tableModal(tableId, tables, orders) {
         <ul>${o.items.map(i => `<li><span class="q">${i.qty}×</span> ${i.emoji} ${esc(i.name)}</li>`).join('')}</ul>
         <div class="actions">
           ${o.status === 'listo' ? `<button class="btn green small" data-action="set-status" data-id="${o.id}" data-status="servido">✅ Entregar</button>` : ''}
+          ${!['pagado', 'cancelado'].includes(o.status) && ['cajero', 'encargado', 'dueno'].includes(S.user.role) ? `<button class="btn green small" data-action="pay-order" data-id="${o.id}">💵 Cobrar</button>` : ''}
           ${!['pagado', 'cancelado'].includes(o.status) ? `<button class="btn blue small" data-action="add-items" data-id="${o.id}">➕ Agregar productos</button>` : ''}
           ${waBoton(o)}
         </div>
@@ -1096,6 +1097,7 @@ function pedidosView(orders, withServe) {
       <div class="cart-total"><span>Total</span><span>${price(o.total)}</span></div>
       <div class="row" style="margin-top:10px">
         ${withServe && o.status === 'listo' ? `<button class="btn green small" data-action="set-status" data-id="${o.id}" data-status="servido">✅ Marcar entregado</button>` : ''}
+        ${!['pagado', 'cancelado'].includes(o.status) && ['cajero', 'encargado', 'dueno'].includes(S.user.role) ? `<button class="btn green small" data-action="pay-order" data-id="${o.id}">💵 Cobrar</button>` : ''}
         ${withServe && !['pagado', 'cancelado'].includes(o.status) ? `<button class="btn blue small" data-action="add-items" data-id="${o.id}">➕ Agregar</button>` : ''}
         ${waBoton(o)}
         ${S.user.role !== 'mesero' && !['pagado', 'cancelado'].includes(o.status) ? `<button class="btn red small" data-action="cancel-order" data-id="${o.id}">✖ Cancelar</button>` : ''}
@@ -1170,7 +1172,8 @@ function cajeroView(tab, data) {
     </table></div>` : '<div class="empty"><span class="big">💰</span>Aún no hay cobros hoy</div>'}`;
   }
 
-  const porCobrar = data.orders.filter(o => ['servido', 'por_pagar'].includes(o.status));
+  const porCobrar = data.orders.filter(o => ['servido', 'por_pagar'].includes(o.status)
+    || (o.status === 'listo' && o.orderType === 'llevar'));
   return `<div class="section-title">💰 Por cobrar <span class="muted">${porCobrar.length} pedido(s)</span></div>
   ${porCobrar.length ? `<div class="grid cols-2">
     ${porCobrar.map(o => `<div class="card">
@@ -1404,15 +1407,19 @@ function mesasQrView(tables, orders) {
   const canQr = ['encargado', 'dueno'].includes(S.user.role);
   return `<div class="section-title">🪑 Mesas
     <button class="btn small" data-action="table-new">➕ Nueva mesa</button></div>
+  <p class="muted" style="margin:-6px 0 14px">Toca una mesa para ver sus pedidos: puedes marcar <strong>entregado</strong> en la mesa y <strong>cobrar</strong> sin cambiar de perfil.</p>
   <div class="grid cols-4" style="margin-bottom:24px">
     ${tables.map(t => {
       const act = orders.filter(o => o.tableId === t.id && !['pagado', 'cancelado'].includes(o.status));
-      return `<div class="card table-card">
+      const total = act.reduce((s, o) => s + o.total, 0);
+      return `<div class="card table-card" data-action="open-table" data-id="${t.id}" style="cursor:pointer">
         <div class="num">${t.number}</div>
         <div class="seats">🪑 ${t.seats} asientos</div>
         <span class="chip ${t.status}">${t.status}</span>
-        ${act.length ? `<div class="pend">${price(act.reduce((s, o) => s + o.total, 0))} pendiente</div>` : ''}
+        ${total ? `<div class="pend">${price(total)} pendiente</div>` : ''}
+        ${act.length ? `<div class="muted">${act.length} pedido(s) activo(s)</div>` : ''}
         <div class="row" style="justify-content:center;margin-top:10px">
+          <button class="btn small secondary" data-action="open-table" data-id="${t.id}">🧾 Ver / entregar</button>
           <button class="btn small secondary" data-action="table-edit" data-id="${t.id}">✏️</button>
           <button class="btn small ghost" data-action="table-delete" data-id="${t.id}">🗑️</button>
         </div>
@@ -1745,7 +1752,12 @@ async function act(action, el, ev) {
     }
 
     /* ---- pago ---- */
-    case 'pay-order': payModal(id); break;
+    case 'pay-order': {
+      // Se refresca la lista para que el modal tenga el pedido y su total al día.
+      S._ordersCache = await api('/orders');
+      payModal(Number(id));
+      break;
+    }
     case 'confirm-pay': {
       const method = document.getElementById('pay-method')?.value || 'efectivo';
       const amount = Number(document.getElementById('pay-amount')?.value || 0);
@@ -1843,16 +1855,7 @@ async function act(action, el, ev) {
     }
 
     /* ---- cobro ---- */
-    case 'pay-order': S._ordersCache = (await api('/orders')); payModal(Number(id)); break;
-    case 'confirm-pay': {
-      const method = document.getElementById('pay-method').value;
-      const amount = Number(document.getElementById('pay-amount').value);
-      await api(`/orders/${id}/pay`, { method: 'POST', body: { method, amount } });
-      closeModal();
-      toast('¡Pago registrado! 💵');
-      render();
-      break;
-    }
+    /* (el cobro se maneja en la sección de pago, arriba) */
 
     /* ---- personal ---- */
     case 'user-new': userModal(); break;

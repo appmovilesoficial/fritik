@@ -58,6 +58,14 @@ El perfil **encargado** puede operar todas las áreas: ventas y mesas,
 preparación (cocina), cobros y caja, menú, llamados y resumen. Los accesos
 rápidos de prueba ya no se muestran en la pantalla de login.
 
+Como **mesero**, el encargado puede abrir cualquier mesa desde **🪑 Mesas y QR**
+o la pestaña **🧾 Pedidos** y marcar el pedido como **✅ Entregado** cuando la
+cocina lo tiene listo. Como **cajero**, puede cobrar desde **💰 Por cobrar** o
+con el botón **💵 Cobrar** de cada pedido (también aparece en el detalle de la
+mesa); al confirmar el pago, el pedido queda **pagado**, se registra el método
+de pago y la mesa se libera si no tiene otros pedidos abiertos. El **dueño**
+tiene las mismas acciones.
+
 Los precios se muestran en dólares (**$**) y su equivalente en bolívares con
 la **tasa oficial del dólar del BCV**, consultada desde
 `ve.dolarapi.com/v1/dolares/oficial`.
