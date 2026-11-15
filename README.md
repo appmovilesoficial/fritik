@@ -117,25 +117,33 @@ El cliente no ve el botón **Salir** ni la pantalla de login del personal.
 Cada perfil con sesión abierta recibe avisos en el propio navegador, sin
 depender de otra app:
 
-- **Sonido** de campana (Web Audio, sin archivos) al llegar un aviso.
+- **Sonido** de campana largo (1,5–2,5 s, Web Audio, sin archivos) al llegar un aviso.
+- **Voz femenina** (Web Speech API) que anuncia «Nuevo pedido, Mesa 3» o
+  «Atención, hay pedidos en cola».
 - **Tarjeta flotante** con botón **Ver** que abre la pestaña correspondiente.
 - **Título de la pestaña** parpadeando mientras está en segundo plano.
 - **Notificación del sistema** si se concede el permiso (móvil y escritorio).
+- **Recordatorio de cola**: si un pedido sigue en `nuevo` después de 1 minuto
+  sin que cocina empiece la preparación, todos los perfiles del equipo reciben
+  **ATENTOS: hay pedidos en cola** (una vez por pedido y por sesión).
 
 Qué recibe cada perfil:
 
 | Perfil | Avisos |
 | --- | --- |
-| Vendedor (mesero) | pedidos nuevos, pedidos listos, llamados y cuentas |
-| Preparador (cocinero) | pedidos nuevos |
-| Cajero | mesas que piden la cuenta |
-| Encargado / Dueño | todo: pedidos nuevos, listos, llamados y cuentas |
+| Vendedor (mesero) | pedidos nuevos, pedidos listos, llamados, cuentas y cola |
+| Preparador (cocinero) | pedidos nuevos y recordatorio de cola |
+| Cajero | mesas que piden la cuenta y recordatorio de cola |
+| Encargado / Dueño | todo: pedidos nuevos, listos, llamados, cuentas y cola |
 | Cliente | su pedido cuando está listo |
 
 El botón 🔔 de la barra superior abre **Avisos y sonido**, donde se activa o
-silencia la campana y se concede el permiso del navegador. El panel consulta
-cada 10 s con la pestaña visible y cada 25 s en segundo plano (los móviles
-pueden espaciarlo más). Para que suene, el teléfono no debe estar en silencio.
+silencia la campana, se activa o apaga la voz, se prueba el aviso y se prueba
+el recordatorio de cola, además de conceder el permiso del navegador. La voz
+usa las voces del sistema; en iPhone hay que añadir la web a inicio. El panel
+consulta cada 10 s con la pestaña visible y cada 25 s en segundo plano (los
+móviles pueden espaciarlo más). Para que suene, el teléfono no debe estar en
+silencio.
 
 `docs/sw.js` es un service worker mínimo, sin caché, que solo permite mostrar
 las notificaciones del sistema en Android; en iPhone hay que añadir la web a la

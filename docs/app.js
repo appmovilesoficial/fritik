@@ -18,8 +18,10 @@ const S = {
   renderSeq: 0,
   lastHtml: null,
   sound: localStorage.getItem('fritik_sound') !== '0', // campana activada por defecto
+  voice: localStorage.getItem('fritik_voice') !== '0', // voz femenina activada por defecto
   seenOrders: null,   // Map id → estado, para detectar pedidos nuevos y cambios
   seenNotifs: null,   // Set de ids de llamados ya avisados
+  reminded: null,     // Set de pedidos ya recordados por estar en cola
 };
 
 /* ---------------- Moneda: $ (principal) + Bs. con tasa oficial del BCV ---------------- */
@@ -275,14 +277,14 @@ function makeQrSvg(text) {
 
 function saveSession(token, user, table = null) {
   S.token = token; S.user = user; S.table = table;
-  S.seenOrders = null; S.seenNotifs = null; S.lastHtml = null;
+  S.seenOrders = null; S.seenNotifs = null; S.reminded = null; S.lastHtml = null;
   localStorage.setItem('fritik_token', token);
 }
 
 function clearSession() {
   S.token = null; S.user = null; S.table = null; S.cart = [];
   S.orderType = null; S.customerName = '';
-  S.seenOrders = null; S.seenNotifs = null; S.lastHtml = null;
+  S.seenOrders = null; S.seenNotifs = null; S.reminded = null; S.lastHtml = null;
   localStorage.removeItem('fritik_token');
 }
 
@@ -316,17 +318,23 @@ function closeModal() {
    - Cada perfil recibe solo lo que le corresponde.
    ============================================================ */
 const BASE_TITLE = document.title;
-const ALERT_ICON = { pedido: '🍭', listo: '✅', cuenta: '🧾', llamado: '🔔' };
+const ALERT_ICON = { pedido: '🍭', listo: '✅', cuenta: '🧾', llamado: '🔔', cola: '⏰' };
+// Cada nota es [frecuencia, segundo de inicio, duración]. Tonos largos (1,5–2,5 s).
 const SOUND_NOTES = {
-  pedido: [[784, 0], [1046, 0.16], [1318, 0.32]],
-  listo: [[1046, 0], [1318, 0.14]],
-  cuenta: [[880, 0], [1174, 0.16]],
-  llamado: [[988, 0], [1318, 0.15], [988, 0.3], [1318, 0.45]],
+  pedido: [[784, 0, .5], [988, .28, .5], [1175, .56, .55], [1568, .9, .85]],
+  listo: [[1046, 0, .45], [1318, .26, .45], [1568, .52, .8]],
+  cuenta: [[880, 0, .45], [1174, .26, .45], [880, .56, .45], [1174, .82, .8]],
+  llamado: [[988, 0, .38], [1318, .24, .38], [988, .48, .38], [1318, .72, .38], [1568, 1, .8]],
+  cola: [[740, 0, .35], [880, .22, .35], [740, .44, .35], [880, .66, .35], [988, .88, .5], [1174, 1.22, 1]],
 };
+// Si el cocinero no empieza a preparar en este tiempo, se recuerda la cola.
+const COLA_MIN_MS = 60 * 1000;
 
 let AC = null; // AudioContext: los navegadores solo dejan sonar tras un toque del usuario
 let titleTimer = null;
 let swReady = null;
+let VOICE;      // undefined = aún no buscada; null = sin voz disponible
+let voiceTimer = null;
 
 if ('serviceWorker' in navigator) {
   // Sin caché: solo se usa para mostrar notificaciones del sistema en el móvil.
@@ -345,23 +353,68 @@ function audioCtx() {
   if (!AC || AC.state !== 'running') audioCtx();
 }, true));
 
+/* ---------------- Voz femenina (Web Speech API) ---------------- */
+function pickVoice() {
+  if (!('speechSynthesis' in window)) return null;
+  if (VOICE !== undefined) return VOICE;
+  const voces = window.speechSynthesis.getVoices() || [];
+  const es = voces
+    .filter(v => /^es/i.test(v.lang))
+    .sort((a, b) => {
+      const prio = v => /es-(VE|419|US|MX|CO|CL|AR|PE)/i.test(v.lang) ? 0 : 1;
+      return prio(a) - prio(b);
+    });
+  VOICE =
+    es.find(v => /(m[oó]nica|paulina|helena|laura|sabina|marisol|elena|female|mujer|google espa)/i.test(v.name)) ||
+    es.find(v => /google/i.test(v.name) && !/(raul|pablo|jorge|diego|carlos|male|hombre)/i.test(v.name)) ||
+    es.find(v => !/(raul|pablo|jorge|diego|carlos|male|hombre)/i.test(v.name)) ||
+    es[0] ||
+    null;
+  return VOICE;
+}
+
+if ('speechSynthesis' in window) {
+  window.speechSynthesis.onvoiceschanged = () => { VOICE = undefined; pickVoice(); };
+  pickVoice();
+}
+
+function speak(texto) {
+  if (!S.voice || !texto || !('speechSynthesis' in window)) return;
+  try {
+    const u = new SpeechSynthesisUtterance(texto);
+    u.lang = 'es-VE';
+    u.rate = 1.02;
+    u.pitch = 1.18;          // timbre más femenino
+    u.volume = 1;
+    const v = pickVoice();
+    if (v) u.voice = v;
+    window.speechSynthesis.cancel();  // corta el aviso anterior, no acumula voces
+    window.speechSynthesis.speak(u);
+  } catch (e) { /* navegador sin voz */ }
+}
+
+function vozDiferida(texto) {
+  clearTimeout(voiceTimer);
+  voiceTimer = setTimeout(() => speak(texto), 1000); // deja sonar la campana y luego habla
+}
+
 function chime(tipo) {
   if (!S.sound) return;
   const ctx = audioCtx();
   if (!ctx) return;
   const t0 = ctx.currentTime + 0.03;
-  (SOUND_NOTES[tipo] || SOUND_NOTES.pedido).forEach(([freq, at]) => {
+  (SOUND_NOTES[tipo] || SOUND_NOTES.pedido).forEach(([freq, at, dur = 0.45]) => {
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.type = 'sine';
     osc.frequency.setValueAtTime(freq, t0 + at);
     gain.gain.setValueAtTime(0.0001, t0 + at);
     gain.gain.exponentialRampToValueAtTime(0.22, t0 + at + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + at + 0.38);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + at + dur);
     osc.connect(gain);
     gain.connect(ctx.destination);
     osc.start(t0 + at);
-    osc.stop(t0 + at + 0.42);
+    osc.stop(t0 + at + dur + 0.05);
   });
 }
 
@@ -409,7 +462,7 @@ function flashTitle(titulo) {
   window.addEventListener('focus', stop);
 }
 
-function alerta(tipo, titulo, detalle, tab, conSonido = true) {
+function alerta(tipo, titulo, detalle, tab, conSonido = true, voz = '') {
   let layer = document.getElementById('alert-layer');
   if (!layer) {
     layer = document.createElement('div');
@@ -445,6 +498,7 @@ function alerta(tipo, titulo, detalle, tab, conSonido = true) {
   }, 15000);
 
   if (conSonido) chime(tipo);
+  if (voz) vozDiferida(voz);
   osNotify(titulo, detalle, tipo);
   flashTitle(titulo);
 }
@@ -514,6 +568,23 @@ function checkAlerts(role, orders, notifs) {
     return tabs[0] || deseada;
   };
 
+  // Recordatorio de cola: pedidos que siguen en "nuevo" pasado un minuto.
+  // Se avisa una sola vez por pedido y por sesión.
+  const enCola = [];
+  if (['mesero', 'cocinero', 'encargado', 'dueno', 'cajero'].includes(role)) {
+    const recordados = S.reminded || new Set();
+    (orders || []).forEach(o => {
+      if (o.status !== 'nuevo' || !o.createdAt || recordados.has(o.id)) return;
+      const espera = Date.now() - o.createdAt;
+      if (espera < COLA_MIN_MS) return;
+      recordados.add(o.id);
+      enCola.push({ order: o, min: Math.max(1, Math.floor(espera / 60000)) });
+    });
+    // Solo se conservan los que siguen en cola, para no crecer sin límite.
+    S.reminded = new Set([...recordados].filter(id =>
+      (orders || []).some(o => o.id === id && o.status === 'nuevo')));
+  }
+
   if (nuevos.length) {
     const lugares = uniq(nuevos.map(lugar));
     avisos.push(['pedido',
@@ -546,10 +617,40 @@ function checkAlerts(role, orders, notifs) {
     `Tu pedido #${o.id} está listo 🍭`,
     o.orderType === 'llevar' ? 'Pasa por el mostrador' : `Servido en la mesa ${o.tableNumber}`,
     tabSeguro('pedido')]));
+  if (enCola.length) {
+    const mesas = uniq(enCola.map(x => lugar(x.order)));
+    const min = Math.max(...enCola.map(x => x.min));
+    avisos.push(['cola',
+      'ATENTOS: hay pedidos en cola',
+      enCola.length === 1
+        ? `Un pedido lleva ${min} min sin empezar · ${recorte(mesas, 3)}`
+        : `${enCola.length} pedidos sin empezar · el más antiguo hace ${min} min · ${recorte(mesas, 3)}`,
+      role === 'cajero' ? null : tabSeguro('pedidos')]);
+  }
 
-  // Un solo sonido por tanda y máximo 4 tarjetas, para no aturdir.
-  avisos.slice(0, 4).forEach(([tipo, titulo, detalle, tab], i) =>
-    alerta(tipo, titulo, detalle, tab, i === 0));
+  const voces = [];
+  if (nuevos.length) {
+    voces.push(nuevos.length === 1
+      ? (nuevos[0].orderType === 'llevar'
+        ? 'Nuevo pedido para llevar'
+        : `Nuevo pedido, Mesa ${nuevos[0].tableNumber}`)
+      : `Atención, ${nuevos.length} pedidos nuevos`);
+  }
+  if (enCola.length) voces.push('Atención, hay pedidos en cola');
+
+  // Las tarjetas se muestran sin sonido y la campana suena una sola vez.
+  // La tarjeta de cola va al final (cada alerta se inserta arriba) para que se vea primero.
+  const mostrar = avisos.slice(0, 4);
+  if (enCola.length && !mostrar.some(a => a[0] === 'cola')) {
+    mostrar[mostrar.length - 1] = avisos[avisos.length - 1];
+  }
+  mostrar.forEach(([tipo, titulo, detalle, tab]) =>
+    alerta(tipo, titulo, detalle, tab, false));
+  if (!avisos.length) return;
+  if (nuevos.length) chime('pedido');
+  else if (enCola.length) chime('cola');
+  else chime(avisos[0][0]);
+  if (voces.length) vozDiferida(voces.join('. '));
 }
 
 function notifyModal() {
@@ -573,13 +674,20 @@ function notifyModal() {
       <div><strong>Sonido del panel</strong><br><span class="muted">Campana al llegar un aviso.</span></div>
       <button class="btn small ${S.sound ? 'green' : 'secondary'}" data-action="sound-toggle">${S.sound ? '🔊 Activado' : '🔕 Silenciado'}</button>
     </div>
+    <div class="card" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px">
+      <div><strong>Voz de los avisos</strong><br><span class="muted">Anuncia los pedidos nuevos y la cola.</span></div>
+      <button class="btn small ${S.voice ? 'green' : 'secondary'}" data-action="voice-toggle">${S.voice ? '🗣️ Activada' : '🔇 Apagada'}</button>
+    </div>
     <div class="card" style="display:flex;align-items:center;justify-content:space-between;gap:12px">
       <div><strong>Avisos del navegador</strong><br><span class="muted">Para verlos con la pestaña en segundo plano.</span></div>
       ${estado}
     </div>
     ${nota}
+    <p class="muted">⏰ Si un pedido sigue sin empezar después de 1 minuto, todos los perfiles del equipo recuerdan: <strong>ATENTOS: hay pedidos en cola</strong>.</p>
     <div class="actions">
       <button class="btn secondary" data-action="close-modal">Cerrar</button>
+      <button class="btn secondary" data-action="voice-test">🗣️ Probar voz</button>
+      <button class="btn secondary" data-action="notify-test-cola">⏰ Probar recordatorio</button>
       <button class="btn" data-action="notify-test">🔔 Probar aviso</button>
     </div>`, true);
 }
@@ -1589,6 +1697,29 @@ async function act(action, el, ev) {
       const perm = await Notification.requestPermission();
       toast(perm === 'granted' ? '🔔 Avisos del navegador activados' : 'No se activaron los avisos del navegador', perm === 'granted' ? 'ok' : 'err');
       notifyModal();
+      break;
+    }
+    case 'voice-toggle': {
+      S.voice = !S.voice;
+      localStorage.setItem('fritik_voice', S.voice ? '1' : '0');
+      if (S.voice) speak('Voz de avisos activada');
+      else if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+      notifyModal();
+      render();
+      break;
+    }
+    case 'voice-test': {
+      if (!('speechSynthesis' in window)) { toast('Este navegador no tiene voz disponible', 'err'); break; }
+      const antes = S.voice;
+      S.voice = true;
+      speak('Nuevo pedido, Mesa 2. Atención, hay pedidos en cola');
+      S.voice = antes;
+      break;
+    }
+    case 'notify-test-cola': {
+      chime('cola');
+      alerta('cola', 'ATENTOS: hay pedidos en cola', 'Ejemplo: un pedido espera 2 min sin empezar · Mesa 2', S.tab, false);
+      vozDiferida('Atención, hay pedidos en cola');
       break;
     }
     case 'notify-test': {

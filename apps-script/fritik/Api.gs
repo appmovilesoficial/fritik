@@ -421,7 +421,8 @@ function visibleOrders(user, orders) {
     case 'cocinero':
       return orders.filter(function (o) { return ['nuevo', 'preparando', 'listo'].indexOf(o.status) !== -1; });
     case 'cajero':
-      return orders.filter(function (o) { return ['servido', 'por_pagar', 'pagado'].indexOf(o.status) !== -1; });
+      // Incluye "nuevo" para que caja también recuerde los pedidos en cola.
+      return orders.filter(function (o) { return ['nuevo', 'servido', 'por_pagar', 'pagado'].indexOf(o.status) !== -1; });
     case 'mesero':
       return orders;
     default:
