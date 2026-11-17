@@ -1558,7 +1558,22 @@ function mesasQrView(tables, orders) {
       </div>`;
     }).join('')}
   </div>
-  ${canQr ? `<div class="section-title">📱 Códigos QR por mesa <span class="muted">Escanea desde la mesa para pedir</span></div>
+  ${canQr ? `<div class="section-title">📖 QR de la carta <span class="muted">Para mostrador, vitrina o publicidad</span></div>
+  <div class="grid cols-4" style="margin-bottom:24px">
+    <div class="card qr-card" id="qr-carta">
+      <h3>Carta y para llevar</h3>
+      <div class="muted">Generando…</div>
+      <div class="actions" style="justify-content:center">
+        <button class="btn small secondary" data-action="qr-print" data-id="carta">🖨️ Imprimir</button>
+        <button class="btn small ghost" data-action="qr-download" data-id="carta">⬇️ SVG</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>¿Para qué sirve?</h3>
+      <p class="muted" style="margin-top:0">Quien escanee este QR abre la carta pública y puede pedir <strong>para llevar</strong> sin mesa. Imprímelo y colócalo en el mostrador, la vitrina o los volantes.</p>
+    </div>
+  </div>
+  <div class="section-title">📱 Códigos QR por mesa <span class="muted">Escanea desde la mesa para pedir</span></div>
   <div class="grid cols-4" id="qr-grid">
     ${tables.map(t => `<div class="card qr-card" id="qr-${t.id}">
       <h3>Mesa ${t.number}</h3>
@@ -1574,14 +1589,14 @@ function mesasQrView(tables, orders) {
 async function loadQrCards() {
   if (!['encargado', 'dueno'].includes(S.user?.role)) return;
   S.qrCache = S.qrCache || {};
-  const cards = [...document.querySelectorAll('[id^="qr-mesa"]')];
+  const cards = [...document.querySelectorAll('.qr-card')];
   const base = location.origin + location.pathname.replace(/index\.html$/, '');
   for (const el of cards) {
     const id = el.id.replace('qr-', '');
     try {
       if (!S.qrCache[id]) {
         // La URL es determinista: no hace falta pedirla al backend.
-        const url = `${base}#/mesa/${encodeURIComponent(id)}`;
+        const url = id === 'carta' ? `${base}#/carta` : `${base}#/mesa/${encodeURIComponent(id)}`;
         S.qrCache[id] = { url, svg: makeQrSvg(url) };
       }
       const q = S.qrCache[id];
@@ -1957,12 +1972,17 @@ async function act(action, el, ev) {
       const card = document.getElementById('qr-' + id);
       if (!card) return;
       const w = window.open('', '_blank');
-      w.document.write(`<html><head><title>QR Mesa</title><style>
+      const esCarta = id === 'carta';
+      const title = esCarta ? 'Carta y pedidos para llevar' : 'Mesa ' + card.querySelector('h3').textContent.replace('Mesa ', '');
+      const hint = esCarta
+        ? 'Escanea para ver la carta y pedir para llevar'
+        : 'Escanea para ver el menú y pedir desde tu mesa';
+      w.document.write(`<html><head><title>QR ${esCarta ? 'Carta' : 'Mesa'}</title><style>
         body{font-family:sans-serif;text-align:center;padding:30px}
         svg{width:320px;height:320px;border:2px solid #000;padding:10px}
         h1{font-size:26px}p{color:#555}</style></head><body>
-        <h1>🍬 Fritik — Puro antojo</h1><h2>Mesa ${card.querySelector('h3').textContent.replace('Mesa ', '')}</h2>
-        ${card.dataset.svg}<p>Escanea para ver el menú y pedir desde tu mesa</p>
+        <h1>🍬 Fritik — Puro antojo</h1><h2>${title}</h2>
+        ${card.dataset.svg}<p>${hint}</p>
         <script>window.onload=()=>{window.print()}<\/script></body></html>`);
       w.document.close();
       break;
@@ -1973,7 +1993,7 @@ async function act(action, el, ev) {
       const blob = new Blob([card.dataset.svg], { type: 'image/svg+xml' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = `qr-mesa-${id}.svg`;
+      a.download = `qr-${id === 'carta' ? 'carta' : 'mesa-' + id}.svg`;
       a.click();
       break;
     }

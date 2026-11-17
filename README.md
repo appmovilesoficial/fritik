@@ -66,6 +66,11 @@ mesa); al confirmar el pago, el pedido queda **pagado**, se registra el método
 de pago y la mesa se libera si no tiene otros pedidos abiertos. El **dueño**
 tiene las mismas acciones.
 
+En **🪑 Mesas y QR**, el dueño y el encargado tienen además el **QR de la
+carta** (`#/carta`) con botones **🖨️ Imprimir** y **⬇️ SVG**: sirve para el
+mostrador, la vitrina o los volantes, y quien lo escanea abre la carta pública
+y puede pedir para llevar sin mesa.
+
 Al cobrar con **QR / pago móvil** es obligatorio registrar el **número de
 referencia de 4 dígitos** que muestra el banco: el campo aparece solo al elegir
 ese método y el pago no se confirma sin él (el backend también lo valida). La
