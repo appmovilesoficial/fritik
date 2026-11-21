@@ -937,10 +937,12 @@ function clienteMenu(menu) {
       ${items.map(m => {
         const inCart = S.cart.find(i => i.menuId === m.id);
         const estrella = (m.category === 'Churros' && catActiva !== 'Churros') ? ' <span class="star-tag">⭐ Especialidad</span>' : '';
+        const stockTag = m.trackStock && Number(m.stock) <= 3
+          ? ` <span class="stock-tag">${Number(m.stock) === 1 ? '¡Última unidad!' : '¡Últimas ' + Number(m.stock) + '!'}</span>` : '';
         return `<div class="card dish">
           <div class="emoji">${m.emoji}</div>
           <div class="info">
-            <div class="name">${esc(m.name)}${estrella}</div>
+            <div class="name">${esc(m.name)}${estrella}${stockTag}</div>
             <div class="desc">${esc(m.description)}</div>
             <div class="dish-add">
               <div class="qty-ctrl">
@@ -1501,18 +1503,23 @@ function menuAdminView(menu, canDelete) {
     <button class="btn small" data-action="menu-new">➕ Nuevo producto</button></div>
   ${cats.map(c => `<div class="section-title" style="font-size:16px">${esc(c)}</div>
     <div class="card"><table class="data">
-      <tr><th></th><th>Producto</th><th>Precio</th><th>Disponible</th><th></th></tr>
-      ${menu.filter(m => m.category === c).map(m => `<tr>
+      <tr><th></th><th>Producto</th><th>Precio</th><th>Disponible</th><th>Inventario</th><th></th></tr>
+      ${menu.filter(m => m.category === c).map(m => {
+        const agotado = m.trackStock && Number(m.stock) <= 0;
+        return `<tr>
         <td style="font-size:22px">${m.emoji}</td>
         <td><strong>${esc(m.name)}</strong><div class="muted">${esc(m.description)}</div></td>
         <td>${price(m.price)}</td>
         <td><span class="chip ${m.available ? 'pagado' : 'cancelado'}">${m.available ? 'Sí' : 'No'}</span></td>
+        <td>${m.trackStock
+          ? `<span class="chip ${agotado ? 'cancelado' : 'nuevo'}">${agotado ? 'Agotado' : Number(m.stock) + ' uds.'}</span>`
+          : '<span class="muted">Ilimitado</span>'}</td>
         <td class="row" style="justify-content:flex-end">
           <button class="btn small secondary" data-action="menu-edit" data-id="${m.id}">✏️</button>
           <button class="btn small ${m.available ? 'red' : 'green'}" data-action="menu-toggle" data-id="${m.id}">${m.available ? 'Ocultar' : 'Activar'}</button>
           ${canDelete ? `<button class="btn small ghost" data-action="menu-delete" data-id="${m.id}">🗑️</button>` : ''}
         </td>
-      </tr>`).join('')}
+      </tr>`; }).join('')}
     </table></div>`).join('') || '<div class="empty">Menú vacío</div>'}`;
 }
 
@@ -1528,10 +1535,26 @@ function menuModal(item) {
     <div class="field"><label>Categoría</label><input id="m-cat" value="${esc(m.category)}" list="cats" maxlength="40"/>
       <datalist id="cats"><option>Entradas</option><option>Platos fuertes</option><option>Bebidas</option><option>Postres</option></datalist></div>
     <div class="field"><label>Descripción</label><input id="m-desc" value="${esc(m.description)}" maxlength="120"/></div>
+    <div class="field" style="margin-top:6px">
+      <label class="row" style="align-items:center;gap:8px;cursor:pointer">
+        <input id="m-track" type="checkbox" style="width:auto" ${m.trackStock ? 'checked' : ''}/>
+        Controlar inventario (stock limitado)
+      </label>
+      <div class="muted" style="margin:2px 0 8px">Actívalo para marquesas, bebidas, etc. Se descontará con cada pedido y el producto desaparecerá de la carta al llegar a 0.</div>
+    </div>
+    <div class="field" id="m-stock-field" style="display:${m.trackStock ? '' : 'none'}">
+      <label>Unidades disponibles</label>
+      <input id="m-stock" type="number" min="0" step="1" value="${m.trackStock ? Number(m.stock) : 0}"/>
+      <div class="muted" style="margin-top:6px">Puedes reponer en cualquier momento editando el producto.</div>
+    </div>
     <div class="actions">
       <button class="btn secondary" data-action="close-modal">Cancelar</button>
       <button class="btn" data-action="menu-save" data-id="${item ? item.id : ''}">💾 Guardar</button>
     </div>`);
+  const track = document.getElementById('m-track');
+  track.addEventListener('change', () => {
+    document.getElementById('m-stock-field').style.display = track.checked ? '' : 'none';
+  });
 }
 
 /* ---------------- MESAS Y QR ---------------- */
@@ -1782,7 +1805,13 @@ async function act(action, el, ev) {
 
     /* ---- carrito cliente ---- */
     case 'cart-inc': {
+      const prod = (S.menu || []).find(x => x.id === id);
       const line = S.cart.find(i => i.menuId === id);
+      const actual = line ? line.qty : 0;
+      if (prod && prod.trackStock && actual + 1 > Number(prod.stock)) {
+        const izq = Number(prod.stock);
+        return toast(`Solo queda${izq === 1 ? '' : 'n'} ${izq} unidad${izq === 1 ? '' : 'es'} de ${prod.name}`, 'err');
+      }
       if (line) line.qty++; else S.cart.push({ menuId: id, qty: 1 });
       syncCart();
       break;
@@ -2012,8 +2041,13 @@ async function act(action, el, ev) {
         category: document.getElementById('m-cat').value.trim() || 'Sin categoría',
         emoji: document.getElementById('m-emoji').value.trim() || '🍽️',
         description: document.getElementById('m-desc').value.trim(),
+        trackStock: document.getElementById('m-track').checked,
+        stock: Math.max(0, Math.floor(Number(document.getElementById('m-stock').value) || 0)),
       };
       if (!body.name || !body.price) return toast('Nombre y precio son obligatorios', 'err');
+      if (body.trackStock && body.stock < 1) {
+        return toast('Escribe cuántas unidades hay disponibles', 'err');
+      }
       if (id) await api('/menu/' + id, { method: 'PATCH', body });
       else await api('/menu', { method: 'POST', body });
       closeModal();
@@ -2110,8 +2144,8 @@ async function addItemsModal(orderId) {
   openModal(`
     <h2>➕ Agregar productos al pedido #${orderId}</h2>
     <div class="field"><label>Producto</label>
-      <select id="ai-menu">${menu.filter(m => m.available).map(m =>
-        `<option value="${m.id}">${m.emoji} ${esc(m.name)} — ${money(m.price)}</option>`).join('')}</select></div>
+      <select id="ai-menu">${menu.filter(m => m.available && !(m.trackStock && Number(m.stock) <= 0)).map(m =>
+        `<option value="${m.id}">${m.emoji} ${esc(m.name)} — ${money(m.price)}${m.trackStock ? ' · quedan ' + Number(m.stock) : ''}</option>`).join('')}</select></div>
     <div class="field"><label>Cantidad</label><input id="ai-qty" type="number" min="1" max="99" value="1"/></div>
     <div class="actions">
       <button class="btn secondary" data-action="close-modal">Cancelar</button>

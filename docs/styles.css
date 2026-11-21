@@ -146,6 +146,11 @@ label { font-size: 13px; color: var(--muted); display: block; margin-bottom: 6px
   background: var(--accent); color: #fff; font-size: 10px; font-weight: 800;
   text-transform: uppercase; letter-spacing: .4px; padding: 2px 7px; border-radius: 999px;
 }
+.stock-tag {
+  display: inline-block; vertical-align: middle; margin-left: 6px;
+  background: #fff0b8; color: #7a5600; font-size: 10px; font-weight: 800;
+  letter-spacing: .2px; padding: 2px 7px; border-radius: 999px;
+}
 
 /* ---------- Botones ---------- */
 .btn {

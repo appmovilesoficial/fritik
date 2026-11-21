@@ -92,6 +92,24 @@ nueva tasa. La barra superior indica `fecha valor: lunes ... · tasa del lunes �
 aplica viernes a lunes`. Si al entrar el viernes a las 5:01 pm el BCV aún no
 publicó, se conserva la última tasa válida y se reintenta cada 30 minutos.
 
+## Inventario por producto
+
+En **📖 Menú**, el encargado o el dueño pueden marcar **Controlar inventario**
+en productos de stock limitado (marquesas, bebidas, etc.) e indicar cuántas
+unidades hay. Al crear un producto con inventario se requiere al menos 1
+unidad.
+
+El stock se descuenta cuando se confirma el pedido (incluye productos que el
+personal agrega a un pedido) y se devuelve automáticamente si el pedido se
+cancela o se elimina. La tabla del menú muestra `N uds.`, `Agotado` o
+`Ilimitado`.
+
+En la carta del cliente, los productos controlados que llegan a 0
+**desaparecen solos** y ya no se pueden agregar al carrito; el backend también
+rechaza pedidos que excedan el stock y avisa cuántas unidades quedan. Cuando
+quedan 3 o menos se muestra `¡Últimas N!`. Para reponer, edita el producto y
+cambia la cantidad.
+
 Cuando un pedido de mesa queda **pagado**, desaparece de la vista del cliente:
 el historial de la mesa (productos y montos vendidos) es privado del negocio.
 El **encargado** y el **dueño** pueden **eliminar** un pedido desde la pestaña

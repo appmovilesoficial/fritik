@@ -295,7 +295,9 @@ apiRoute_('GET', '/api/me', [auth, function (req, res) {
 apiRoute_('GET', '/api/menu', [auth, function (req, res) {
   var items = D().menu;
   if (req.user.role === 'cliente') {
-    items = items.filter(function (m) { return m.available; });
+    items = items.filter(function (m) {
+      return m.available && !(m.trackStock && (Number(m.stock) || 0) <= 0);
+    });
   }
   res.json(items);
 }]);
@@ -303,10 +305,13 @@ apiRoute_('GET', '/api/menu', [auth, function (req, res) {
 apiRoute_('POST', '/api/menu', [minRank(4), function (req, res) {
   var b = req.body || {};
   if (!b.name || b.price == null) return res.status(400).json({ error: 'Nombre y precio son obligatorios' });
+  var trackStock = !!b.trackStock;
   var item = {
     id: uid('m_'), name: b.name, price: Number(b.price),
     category: b.category || 'Sin categoría',
     emoji: b.emoji || '🍽️', description: b.description || '', available: true,
+    trackStock: trackStock,
+    stock: trackStock ? Math.max(0, Math.floor(Number(b.stock) || 0)) : 0,
   };
   D().menu.push(item);
   save();
@@ -320,6 +325,9 @@ apiRoute_('PATCH', '/api/menu/:id', [minRank(4), function (req, res) {
   fields.forEach(function (f) {
     if (req.body[f] !== undefined) item[f] = f === 'price' ? Number(req.body[f]) : req.body[f];
   });
+  if (req.body.trackStock !== undefined) item.trackStock = !!req.body.trackStock;
+  if (req.body.stock !== undefined) item.stock = Math.max(0, Math.floor(Number(req.body.stock) || 0));
+  if (!item.trackStock) item.stock = 0;
   save();
   res.json(item);
 }]);
@@ -407,6 +415,26 @@ function totalOf(order) {
   return order.items.reduce(function (s, i) { return s + i.price * i.qty; }, 0);
 }
 
+// Devuelve al inventario las unidades que este pedido había descontado.
+// Se usa al cancelar o al borrar el pedido; stockReturned evita devolver dos veces.
+function restockOrder_(order) {
+  if (!order || order.stockReturned) return;
+  var db = D();
+  (order.items || []).forEach(function (i) {
+    var taken = Number(i.stockQty) || 0;
+    if (!taken) return;
+    var m = db.menu.filter(function (x) { return x.id === i.menuId; })[0];
+    if (m && m.trackStock) m.stock = (Number(m.stock) || 0) + taken;
+  });
+  order.stockReturned = true;
+}
+
+function sinStockText_(n, name) {
+  n = Number(n) || 0;
+  return 'Solo queda' + (n === 1 ? '' : 'n') + ' ' + n
+    + (n === 1 ? ' unidad de ' : ' unidades de ') + name;
+}
+
 function visibleOrders(user, orders) {
   switch (user.role) {
     case 'cliente':
@@ -466,15 +494,28 @@ apiRoute_('POST', '/api/orders', [auth, function (req, res) {
   }
 
   var orderItems = [];
+  var needed = {};
   for (var i = 0; i < b.items.length; i++) {
     var it = b.items[i];
     var m = db.menu.filter(function (x) { return x.id === it.menuId && x.available; })[0];
     if (!m) return res.status(400).json({ error: 'Un producto del pedido ya no está disponible' });
+    var qty = Math.max(1, Math.min(99, Number(it.qty) || 1));
+    needed[m.id] = (needed[m.id] || 0) + qty;
     orderItems.push({
       menuId: m.id, name: m.name, emoji: m.emoji, price: m.price,
-      qty: Math.max(1, Math.min(99, Number(it.qty) || 1)),
-      notes: String(it.notes || '').slice(0, 200),
+      qty: qty, notes: String(it.notes || '').slice(0, 200),
+      stockQty: m.trackStock ? qty : 0,
     });
+  }
+
+  // Inventario: se valida todo el pedido antes de descontar nada.
+  for (var mid in needed) {
+    var vm = db.menu.filter(function (x) { return x.id === mid; })[0];
+    if (vm && vm.trackStock && (Number(vm.stock) || 0) < needed[mid]) {
+      return res.status(400).json({
+        error: sinStockText_(vm.stock, vm.name)
+      });
+    }
   }
 
   var order = {
@@ -495,6 +536,12 @@ apiRoute_('POST', '/api/orders', [auth, function (req, res) {
   };
   db.orders.push(order);
   if (table) table.status = 'ocupada';
+
+  // Después de validar y crear el pedido se descuenta el inventario.
+  for (var mid2 in needed) {
+    var dm = db.menu.filter(function (x) { return x.id === mid2; })[0];
+    if (dm && dm.trackStock) dm.stock = (Number(dm.stock) || 0) - needed[mid2];
+  }
   save();
 
   // Aviso automático al WhatsApp del negocio (solo pedidos de clientes).
@@ -518,16 +565,24 @@ apiRoute_('POST', '/api/orders/:id/items', [minRank(2), function (req, res) {
   var b = req.body || {};
   var m = D().menu.filter(function (x) { return x.id === b.menuId && x.available; })[0];
   if (!m) return res.status(404).json({ error: 'Producto no disponible' });
+  var addQty = Math.max(1, Math.min(99, Number(b.qty) || 1));
+  if (m.trackStock && (Number(m.stock) || 0) < addQty) {
+    return res.status(400).json({
+      error: sinStockText_(m.stock, m.name)
+    });
+  }
 
   var existing = order.items.filter(function (i) { return i.menuId === m.id && !i.notes; })[0];
   if (existing) {
-    existing.qty += Math.max(1, Number(b.qty) || 1);
+    existing.qty += addQty;
+    if (m.trackStock) existing.stockQty = (Number(existing.stockQty) || 0) + addQty;
   } else {
     order.items.push({
       menuId: m.id, name: m.name, emoji: m.emoji, price: m.price,
-      qty: Math.max(1, Number(b.qty) || 1), notes: '',
+      qty: addQty, notes: '', stockQty: m.trackStock ? addQty : 0,
     });
   }
+  if (m.trackStock) m.stock = (Number(m.stock) || 0) - addQty;
   order.history.push({ status: order.status, at: Date.now(), by: req.user.name + ' (agregó productos)' });
   save();
 
@@ -559,6 +614,7 @@ apiRoute_('PATCH', '/api/orders/:id/status', [auth, function (req, res) {
   }
   order.status = next;
   order.history.push({ status: next, at: Date.now(), by: req.user.name });
+  if (next === 'cancelado') restockOrder_(order);
 
   if (next === 'pagado' || next === 'cancelado') {
     var table = D().tables.filter(function (t) { return t.id === order.tableId; })[0];
@@ -619,6 +675,9 @@ apiRoute_('DELETE', '/api/orders/:id', [minRank(4), function (req, res) {
   var id = Number(req.params.id);
   var order = db.orders.filter(function (o) { return o.id === id; })[0];
   if (!order) return res.status(404).json({ error: 'Pedido no encontrado' });
+
+  // Si el pedido había descontado inventario, se devuelve antes de borrarlo.
+  restockOrder_(order);
 
   var antes = db.orders.length;
   db.orders = db.orders.filter(function (o) { return o.id !== id; });
@@ -781,7 +840,9 @@ apiRoute_('GET', '/api/reports/summary', [auth, soloReportes, function (req, res
     openOrders: db.orders.filter(function (o) { return ['pagado', 'cancelado'].indexOf(o.status) === -1; }).length,
     tablesTotal: db.tables.length,
     tablesBusy: db.tables.filter(function (t) { return t.status === 'ocupada'; }).length,
-    menuItems: db.menu.filter(function (m) { return m.available; }).length,
+    menuItems: db.menu.filter(function (m) {
+      return m.available && !(m.trackStock && (Number(m.stock) || 0) <= 0);
+    }).length,
     staff: db.users.filter(function (u) { return u.active; }).length,
   });
 }]);
