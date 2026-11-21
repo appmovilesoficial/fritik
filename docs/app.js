@@ -2188,8 +2188,11 @@ function stopPoll() {
 window.addEventListener('hashchange', () => route().catch(e => toast(e.message, 'err')));
 
 /* ---------------- Tasa oficial del dólar del BCV (consultada desde el navegador) ---------------- */
-const RATE_CACHE_KEY = 'fritik_rate_v2';
+// El BCV publica el viernes por la tarde la tasa que rige el lunes. Por eso,
+// desde el viernes 5:00 pm hasta el lunes se factura con esa misma tasa.
+const RATE_CACHE_KEY = 'fritik_rate_v3';
 const RATE_TTL = 6 * 60 * 60 * 1000;
+const BCV_TZ = 'America/Caracas';
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio',
   'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 const DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
@@ -2202,18 +2205,63 @@ function fechaLegible(iso) {
   return `${DIAS[dow]} ${d} de ${MESES[m - 1]} de ${y}`;
 }
 
+function diaSemanaIso(iso) {
+  if (!iso) return null;
+  const [y, m, d] = String(iso).split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d, 12)).getUTCDay();
+}
+
+function sumarDiasIso(iso, n) {
+  if (!iso) return null;
+  const [y, m, d] = String(iso).split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d + n, 12)).toISOString().slice(0, 10);
+}
+
+// Hora de Venezuela, sin depender del fuso horario del dispositivo.
+function relojBcv(fecha = new Date()) {
+  const partes = new Intl.DateTimeFormat('en-US', {
+    timeZone: BCV_TZ, weekday: 'short', year: 'numeric', month: '2-digit',
+    day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).formatToParts(fecha);
+  const o = {};
+  partes.forEach(p => { if (p.type !== 'literal') o[p.type] = p.value; });
+  return {
+    iso: `${o.year}-${o.month}-${o.day}`,
+    dow: { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }[o.weekday],
+    hour: Number(o.hour),
+  };
+}
+
+// Fecha valor vigente ahora: viernes ≥ 17:00, sábado, domingo y lunes → lunes.
+function periodoBcv(fecha = new Date()) {
+  const c = relojBcv(fecha);
+  if (c.dow === 5 && c.hour >= 17) return sumarDiasIso(c.iso, 3);
+  if (c.dow === 6) return sumarDiasIso(c.iso, 2);
+  if (c.dow === 0) return sumarDiasIso(c.iso, 1);
+  return c.iso;
+}
+
+// La tasa que el BCV publica el viernes ya tiene fecha valor lunes.
+function fechaValorDe(publicacion) {
+  if (!publicacion) return null;
+  return diaSemanaIso(publicacion) === 5 ? sumarDiasIso(publicacion, 3) : publicacion;
+}
+
 async function fetchBcvDolar() {
   const dolar = await fetch('https://ve.dolarapi.com/v1/dolares/oficial').then(r => r.json());
   let tasa = Number(dolar && dolar.promedio);
   // La API a veces devuelve "1.006" cuando el BCV publica "1.006,03" (miles).
   if (Number.isFinite(tasa) && tasa > 0 && tasa < 50) tasa *= 1000;
   if (!Number.isFinite(tasa) || tasa <= 0) return null;
-  const fechaValor = String((dolar && dolar.fechaActualizacion) || '').slice(0, 10) || null;
+  const publicacion = String((dolar && dolar.fechaActualizacion) || '').slice(0, 10) || null;
+  const fechaValor = fechaValorDe(publicacion);
+  const esTasaDelLunes = !!publicacion && fechaValor !== publicacion;
   return {
     tasa,
+    publicacion,
     fechaValor,
     fechaValorLegible: fechaLegible(fechaValor),
-    regla: 'tasa oficial del BCV',
+    regla: esTasaDelLunes ? 'tasa del lunes · aplica viernes a lunes' : 'tasa oficial del BCV',
     fuente: 'BCV — Banco Central de Venezuela',
     actualizado: Date.now(),
   };
@@ -2222,15 +2270,23 @@ async function fetchBcvDolar() {
 async function loadRate(force) {
   let cache = null;
   try { cache = JSON.parse(localStorage.getItem(RATE_CACHE_KEY) || 'null'); } catch (e) { cache = null; }
-  if (!force && cache && cache.tasa && Date.now() - (cache.at || 0) < RATE_TTL) {
+  const esperado = periodoBcv();
+  if (!force && cache && cache.tasa && cache.fechaValor === esperado
+      && Date.now() - (cache.at || 0) < RATE_TTL) {
     RATE = cache;
     return;
   }
   try {
     const r = await fetchBcvDolar();
     if (r) {
-      RATE = r;
-      localStorage.setItem(RATE_CACHE_KEY, JSON.stringify({ ...r, at: Date.now() }));
+      if (r.fechaValor === esperado || !cache || !cache.tasa) {
+        RATE = r;
+        localStorage.setItem(RATE_CACHE_KEY, JSON.stringify({ ...r, at: Date.now() }));
+        return;
+      }
+      // El BCV todavía no publicó la tasa del periodo (p. ej. viernes 17:01):
+      // se mantiene la última tasa válida y se reintenta en el próximo ciclo.
+      RATE = cache;
       return;
     }
   } catch (e) { /* sin red o API caída: se conserva la última tasa */ }

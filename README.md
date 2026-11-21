@@ -85,6 +85,13 @@ Los precios se muestran en dólares (**$**) y su equivalente en bolívares con
 la **tasa oficial del dólar del BCV**, consultada desde
 `ve.dolarapi.com/v1/dolares/oficial`.
 
+El BCV publica el **viernes por la tarde la tasa con fecha valor del lunes**.
+Fritik la aplica desde el **viernes después de las 5:00 pm (hora de
+Venezuela)** y la mantiene el **sábado, domingo y lunes**; el martes cambia a la
+nueva tasa. La barra superior indica `fecha valor: lunes ... · tasa del lunes ·
+aplica viernes a lunes`. Si al entrar el viernes a las 5:01 pm el BCV aún no
+publicó, se conserva la última tasa válida y se reintenta cada 30 minutos.
+
 Cuando un pedido de mesa queda **pagado**, desaparece de la vista del cliente:
 el historial de la mesa (productos y montos vendidos) es privado del negocio.
 El **encargado** y el **dueño** pueden **eliminar** un pedido desde la pestaña
@@ -207,4 +214,4 @@ GitHub Pages (rama `main`, carpeta `/docs`):
 `https://appmovilesoficial.github.io/fritik`
 
 > Fritik y Chilokos comparten el origen `appmovilesoficial.github.io`, por eso
-> las claves de `localStorage` son distintas: `fritik_token` y `fritik_rate_v2`.
+> las claves de `localStorage` son distintas: `fritik_token` y `fritik_rate_v3`.
