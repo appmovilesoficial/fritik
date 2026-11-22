@@ -116,6 +116,12 @@ El **encargado** y el **dueño** pueden **eliminar** un pedido desde la pestaña
 Pedidos (botón 🗑️ Eliminar, con confirmación); si la mesa queda sin pedidos
 abiertos, se libera automáticamente.
 
+La pestaña **🧾 Pedidos** muestra **por defecto solo los pedidos del día
+actual** (vendedor, encargado y dueño). Arriba hay un selector de **Fecha**
+para elegir cualquier día, los botones **📅 Hoy** y **🗓️ Todos**, y un resumen
+con la cantidad de pedidos y el total de ese día. Así se puede consultar
+cuántos pedidos salieron en una fecha determinada.
+
 El **teléfono del cliente es obligatorio** al enviar un pedido (se guarda en el
 navegador para la próxima vez). En los paneles de vendedor, preparador, cajero,
 encargado y dueño aparece el botón **📲 WhatsApp** en cada pedido: genera una

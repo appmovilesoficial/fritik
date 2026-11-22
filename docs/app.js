@@ -13,6 +13,7 @@ const S = {
   customerName: '',
   customerPhone: localStorage.getItem('fritik_phone') || '',
   menu: [],
+  orderDate: 'today',     // filtro de la pestaña Pedidos: hoy, YYYY-MM-DD o 'all'
   modalOpen: false,
   poll: null,
   renderSeq: 0,
@@ -1191,11 +1192,32 @@ function tableModal(tableId, tables, orders) {
 }
 
 /* ---------------- PEDIDOS (lista común) ---------------- */
+function fechaIsoLocal(d = new Date()) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 function pedidosView(orders, withServe) {
-  if (!orders.length) return `<div class="empty"><span class="big">🧾</span>No hay pedidos por ahora</div>`;
-  return `<div class="section-title">Pedidos</div>
-  <div class="grid cols-2">
-    ${orders.map(o => `<div class="card">
+  const filtro = S.orderDate === 'today' ? fechaIsoLocal() : S.orderDate;
+  const todos = !filtro || filtro === 'all';
+  const lista = todos ? orders : orders.filter(o => fechaIsoLocal(new Date(o.createdAt)) === filtro);
+  const totalDia = lista.reduce((s, o) => s + (Number(o.total) || 0), 0);
+  const esHoy = !todos && filtro === fechaIsoLocal();
+  const controles = `<div class="section-title">🧾 Pedidos
+      <span class="muted">${lista.length} pedido(s) · ${price(totalDia)}</span></div>
+    <div class="row" style="gap:8px;align-items:flex-end;margin:-4px 0 14px;flex-wrap:wrap">
+      <div class="field" style="margin:0;width:auto"><label>Fecha</label>
+        <input id="order-date" type="date" value="${todos ? '' : filtro}" style="min-width:170px"/></div>
+      <button class="btn small ${esHoy ? '' : 'secondary'}" data-action="orders-today">📅 Hoy</button>
+      <button class="btn small ${todos ? '' : 'secondary'}" data-action="orders-all">🗓️ Todos</button>
+      <span class="muted" style="margin-left:4px">${todos ? 'Todos los días' : esc(fechaLegible(filtro) || filtro)}</span>
+    </div>`;
+  if (!lista.length) {
+    return controles + `<div class="empty"><span class="big">🧾</span>${
+      todos ? 'No hay pedidos registrados' : 'No hay pedidos para esa fecha'
+    }</div>`;
+  }
+  return controles + `<div class="grid cols-2">
+    ${lista.map(o => `<div class="card">
       <div class="row">
         <strong>#${o.id} · ${destino(o)}</strong> ${chip(o.status)}
         <span class="spacer"></span><span class="muted">${ago(o.createdAt)}</span>
@@ -1798,6 +1820,8 @@ async function act(action, el, ev) {
 
     /* ---- navegación ---- */
     case 'tab': S.tab = el.dataset.tab; render(); break;
+    case 'orders-today': S.orderDate = 'today'; render(); break;
+    case 'orders-all': S.orderDate = 'all'; render(); break;
     case 'go-carta': location.hash = '#/carta'; break;
     case 'cat': catActiva = el.dataset.cat; render(); break;
     case 'close-modal': closeModal(); render(); break;
@@ -2179,6 +2203,11 @@ document.addEventListener('click', e => {
 });
 
 document.addEventListener('change', async e => {
+  if (e.target && e.target.id === 'order-date') {
+    S.orderDate = e.target.value || 'today';
+    render();
+    return;
+  }
   const el = e.target.closest('[data-action="user-role"]');
   if (!el) return;
   try {
