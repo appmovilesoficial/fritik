@@ -592,6 +592,43 @@ apiRoute_('POST', '/api/orders/:id/items', [minRank(2), function (req, res) {
   res.json(out);
 }]);
 
+// Quitar un producto mal agregado. Solo dueño/encargado. Devuelve al
+// inventario únicamente las unidades que esa línea había descontado.
+apiRoute_('DELETE', '/api/orders/:id/items/:idx', [minRank(4), function (req, res) {
+  var db = D();
+  var order = db.orders.filter(function (o) { return o.id === Number(req.params.id); })[0];
+  if (!order) return res.status(404).json({ error: 'Pedido no encontrado' });
+  if (['pagado', 'cancelado'].indexOf(order.status) !== -1) {
+    return res.status(400).json({ error: 'El pedido ya fue cerrado' });
+  }
+  var idx = Number(req.params.idx);
+  if (!isFinite(idx) || idx < 0 || idx >= (order.items || []).length) {
+    return res.status(404).json({ error: 'Producto no encontrado en el pedido' });
+  }
+  if (order.items.length === 1) {
+    return res.status(400).json({ error: 'El pedido quedaría vacío: agrega otro producto o elimina el pedido' });
+  }
+
+  var item = order.items[idx];
+  var taken = Number(item.stockQty) || 0;
+  if (taken) {
+    var m = db.menu.filter(function (x) { return x.id === item.menuId; })[0];
+    if (m && m.trackStock) m.stock = (Number(m.stock) || 0) + taken;
+  }
+
+  order.items.splice(idx, 1);
+  order.history.push({
+    status: order.status, at: Date.now(),
+    by: req.user.name + ' (quitó ' + item.qty + '× ' + item.name + ')'
+  });
+  save();
+
+  var out = {};
+  for (var k in order) out[k] = order[k];
+  out.total = totalOf(order);
+  res.json(out);
+}]);
+
 var TRANSITIONS = {
   nuevo: { preparando: ['cocinero', 'encargado', 'dueno'], cancelado: ['encargado', 'dueno', 'mesero'] },
   preparando: { listo: ['cocinero', 'encargado', 'dueno'], cancelado: ['encargado', 'dueno'] },

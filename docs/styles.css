@@ -169,6 +169,7 @@ label { font-size: 13px; color: var(--muted); display: block; margin-bottom: 6px
 .btn.small { padding: 7px 12px; font-size: 13px; border-radius: 9px; }
 .btn.block { width: 100%; }
 .btn.ghost { background: transparent; border: 1px dashed var(--border); color: var(--muted); box-shadow: none; }
+.btn.mini { padding: 2px 9px; font-size: 12px; border-radius: 8px; margin-left: 6px; }
 
 /* ---------- Login ---------- */
 .login-wrap { min-height: 100vh; display: grid; place-items: center; padding: 20px; }

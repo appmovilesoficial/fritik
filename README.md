@@ -122,6 +122,13 @@ para elegir cualquier día, los botones **📅 Hoy** y **🗓️ Todos**, y un r
 con la cantidad de pedidos y el total de ese día. Así se puede consultar
 cuántos pedidos salieron en una fecha determinada.
 
+El **encargado** y el **dueño** pueden corregir un pedido mal registrado: cada
+producto de la lista tiene un botón **✕** (también en el detalle de la mesa)
+que lo quita del pedido con confirmación y recalcula el total. Si ese producto
+controlaba inventario, sus unidades **vuelven al stock**. No se puede dejar un
+pedido vacío ni quitar productos de un pedido ya pagado o cancelado; para eso
+existe **🗑️ Eliminar**. Vendedor, cocina y caja no pueden quitar productos.
+
 El **teléfono del cliente es obligatorio** al enviar un pedido (se guarda en el
 navegador para la próxima vez). En los paneles de vendedor, preparador, cajero,
 encargado y dueño aparece el botón **📲 WhatsApp** en cada pedido: genera una

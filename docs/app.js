@@ -1177,7 +1177,7 @@ function tableModal(tableId, tables, orders) {
       ${act.map(o => `<div class="ticket">
         <div class="head"><span>Pedido #${o.id} · ${esc(o.createdBy)}</span>${chip(o.status)}</div>
         ${o.customerPhone ? `<div class="notes">📱 ${esc(o.customerPhone)}${o.customerName ? ' · ' + esc(o.customerName) : ''}</div>` : ''}
-        <ul>${o.items.map(i => `<li><span class="q">${i.qty}×</span> ${i.emoji} ${esc(i.name)}</li>`).join('')}</ul>
+        <ul>${o.items.map((i, ix) => `<li><span class="q">${i.qty}×</span> ${i.emoji} ${esc(i.name)}${['encargado', 'dueno'].includes(S.user.role) && !['pagado', 'cancelado'].includes(o.status) && o.items.length > 1 ? ` <button class="btn mini ghost" data-action="remove-item" data-id="${o.id}" data-idx="${ix}" data-name="${esc(i.name)}" data-qty="${i.qty}" title="Quitar ${esc(i.name)}">✕</button>` : ''}</li>`).join('')}</ul>
         <div class="actions">
           ${o.status === 'listo' ? `<button class="btn green small" data-action="set-status" data-id="${o.id}" data-status="servido">✅ Entregar</button>` : ''}
           ${!['pagado', 'cancelado'].includes(o.status) && ['cajero', 'encargado', 'dueno'].includes(S.user.role) ? `<button class="btn green small" data-action="pay-order" data-id="${o.id}">💵 Cobrar</button>` : ''}
@@ -1202,6 +1202,7 @@ function pedidosView(orders, withServe) {
   const lista = todos ? orders : orders.filter(o => fechaIsoLocal(new Date(o.createdAt)) === filtro);
   const totalDia = lista.reduce((s, o) => s + (Number(o.total) || 0), 0);
   const esHoy = !todos && filtro === fechaIsoLocal();
+  const puedeQuitar = ['encargado', 'dueno'].includes(S.user.role);
   const controles = `<div class="section-title">🧾 Pedidos
       <span class="muted">${lista.length} pedido(s) · ${price(totalDia)}</span></div>
     <div class="row" style="gap:8px;align-items:flex-end;margin:-4px 0 14px;flex-wrap:wrap">
@@ -1224,7 +1225,10 @@ function pedidosView(orders, withServe) {
       </div>
       <div class="muted" style="margin-top:4px">Por ${esc(o.createdBy)}${o.customerPhone ? ` · 📱 ${esc(o.customerPhone)}` : ''}</div>
       <div style="margin-top:10px">
-        ${o.items.map(i => `<div class="cart-line"><span>${i.emoji} ${i.qty}× ${esc(i.name)}</span><span>${price(i.price * i.qty)}</span></div>`).join('')}
+        ${o.items.map((i, ix) => {
+          const quitable = puedeQuitar && !['pagado', 'cancelado'].includes(o.status) && o.items.length > 1;
+          return `<div class="cart-line"><span>${i.emoji} ${i.qty}× ${esc(i.name)}${quitable ? ` <button class="btn mini ghost" data-action="remove-item" data-id="${o.id}" data-idx="${ix}" data-name="${esc(i.name)}" data-qty="${i.qty}" title="Quitar ${esc(i.name)}">✕</button>` : ''}</span><span>${price(i.price * i.qty)}</span></div>`;
+        }).join('')}
       </div>
       ${o.notes ? `<div class="notes" style="color:var(--cyan);font-size:13px;margin-top:6px">📝 ${esc(o.notes)}</div>` : ''}
       <div class="cart-total"><span>Total</span><span>${price(o.total)}</span></div>
@@ -1957,6 +1961,17 @@ async function act(action, el, ev) {
       break;
     }
     case 'add-items': addItemsModal(id); break;
+    case 'remove-item': {
+      const oid = Number(id);
+      const idx = Number(el.dataset.idx);
+      const nombre = `${el.dataset.qty}× ${el.dataset.name}`;
+      if (!confirm(`¿Quitar ${nombre} del pedido #${oid}?`)) return;
+      await api(`/orders/${oid}/items/${idx}`, { method: 'DELETE' });
+      closeModal();
+      toast('Producto quitado ✔');
+      render();
+      break;
+    }
     case 'add-items-save': {
       const sel = document.getElementById('ai-menu');
       const qty = Number(document.getElementById('ai-qty').value) || 1;
