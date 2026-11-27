@@ -41,6 +41,14 @@ apps-script/fritik/       Backend (Google Apps Script)
 > credencial nombrada: `clasp -u cunaguaroshop ...` (el token `default` sigue
 > perteneciendo a la cuenta de Chilokos).
 
+## Ver la base de datos
+
+Entra como **dueño** y abre la pestaña **🔍 Base de datos**. Ahí se ven, en
+solo lectura, los pedidos (productos, totales y referencias de cobro), el menú
+con su inventario, los usuarios y las mesas. El botón **⬇️ Descargar JSON**
+guarda una copia legible. Por seguridad no se muestran contraseñas ni tokens
+de sesión, y el endpoint `/api/admin/db` solo responde para el rol `dueno`.
+
 ## Accesos demo (contraseña `1234`)
 
 | Usuario     | Perfil visible |

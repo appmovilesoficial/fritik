@@ -809,7 +809,7 @@ const TABS = {
     ['llamados', '🔔 Llamados'],
     ['avisos', '📲 Avisos'],
   ],
-  dueno: [['dashboard', '📊 Dashboard'], ['reportes', '📈 Reportes'], ['pedidos', '🧾 Pedidos'], ['menu', '📖 Menú'], ['mesas', '🪑 Mesas y QR'], ['personal', '👥 Personal'], ['avisos', '📲 Avisos']],
+  dueno: [['dashboard', '📊 Dashboard'], ['reportes', '📈 Reportes'], ['pedidos', '🧾 Pedidos'], ['menu', '📖 Menú'], ['mesas', '🪑 Mesas y QR'], ['personal', '👥 Personal'], ['db', '🔍 Base de datos'], ['avisos', '📲 Avisos']],
 };
 const defaultTab = role => (TABS[role] || TABS.cliente)[0][0];
 
@@ -1107,16 +1107,18 @@ async function buildStaff(seq) {
   const needNotifs = isStaff;
   const needMenu = isAdmin && tab === 'menu';
   const needWa = isAdmin && tab === 'avisos';
+  const needDb = role === 'dueno' && tab === 'db';
   const needSummary = (role === 'encargado' && ['resumen', 'reportes'].includes(tab))
     || (role === 'dueno' && ['dashboard', 'reportes'].includes(tab));
 
-  const [tables, orders, notifs, menu, summary, wa] = await Promise.all([
+  const [tables, orders, notifs, menu, summary, wa, db] = await Promise.all([
     needTables ? api('/tables') : null,
     api('/orders'),
     needNotifs ? api('/notifications') : null,
     needMenu ? api('/menu') : null,
     needSummary ? api('/reports/summary') : null,
     needWa ? api('/settings/wa').catch(() => null) : null,
+    needDb ? api('/admin/db').catch(() => null) : null,
   ]);
   if (seq !== S.renderSeq) return '';
 
@@ -1126,6 +1128,7 @@ async function buildStaff(seq) {
   if (summary) data.summary = summary;
   if (notifs) data.notifs = notifs;
   if (wa) data.wa = wa;
+  if (db) data.db = db;
   S.notifCount = notifs ? notifs.length : 0;
   S._ordersCache = orders;   // para pagos, WhatsApp y tickets
   checkAlerts(role, orders, notifs);
@@ -1463,8 +1466,76 @@ async function duenoView(tab, data) {
   if (tab === 'menu') return menuAdminView(data.menu, true);
   if (tab === 'mesas') return mesasQrView(data.tables, data.orders);
   if (tab === 'personal') return personalView(await api('/users'));
+  if (tab === 'db') return dbView(data.db || await api('/admin/db'));
   if (tab === 'avisos') return avisosView(data.wa);
   return '';
+}
+
+/* ---------------- BASE DE DATOS (solo lectura, solo dueño) ---------------- */
+function dbView(db) {
+  if (!db) return `<div class="section-title">🔍 Base de datos</div>
+    <div class="empty"><span class="big">⚠️</span>No se pudo cargar la base de datos.</div>`;
+  S._dbSnapshot = db;
+  const cobros = (db.orders || []).reduce((n, o) => n + (o.payments || []).length, 0);
+  const fecha = t => t ? new Date(t).toLocaleString('es-VE', { dateStyle: 'short', timeStyle: 'short' }) : '—';
+  const items = o => (o.items || []).map(i => `${i.qty}× ${i.name}`).join(', ');
+  const pago = o => (o.payments || []).map(p => `${p.method}${p.reference ? ' #' + p.reference : ''} ${money(p.amount)}`).join(' · ') || '—';
+  const filas = (arr, cols, empty) => arr.length ? arr.join('')
+    : `<tr><td colspan="${cols}" class="muted">${empty}</td></tr>`;
+
+  return `<div class="section-title">🔍 Base de datos de Fritik
+      <button class="btn small secondary" data-action="db-download">⬇️ Descargar JSON</button></div>
+    <p class="muted" style="margin:-6px 0 14px">Solo lectura. No se muestran contraseñas ni sesiones.</p>
+    <div class="grid cols-4">
+      <div class="card stat"><div class="value">${(db.orders || []).length}</div><div class="label">Pedidos</div></div>
+      <div class="card stat"><div class="value">${(db.menu || []).length}</div><div class="label">Productos</div></div>
+      <div class="card stat"><div class="value">${(db.users || []).length}</div><div class="label">Usuarios</div></div>
+      <div class="card stat"><div class="value">${cobros}</div><div class="label">Cobros</div></div>
+    </div>
+
+    <div class="section-title">🧾 Pedidos</div>
+    <div class="card" style="overflow-x:auto"><table class="data">
+      <tr><th>#</th><th>Fecha</th><th>Destino</th><th>Estado</th><th>Cliente</th><th>Productos</th><th>Total</th><th>Cobro</th></tr>
+      ${filas((db.orders || []).map(o => `<tr>
+        <td>#${o.id}</td>
+        <td>${fecha(o.createdAt)}</td>
+        <td>${destino(o)}</td>
+        <td>${chip(o.status)}</td>
+        <td>${esc(o.customerName || o.createdBy || '—')}${o.customerPhone ? `<br/><span class="muted">${esc(o.customerPhone)}</span>` : ''}</td>
+        <td>${esc(items(o))}</td>
+        <td>${price(o.total)}</td>
+        <td>${esc(pago(o))}</td>
+      </tr>`), 8, 'Sin pedidos')}
+    </table></div>
+
+    <div class="section-title">📖 Menú e inventario</div>
+    <div class="card" style="overflow-x:auto"><table class="data">
+      <tr><th>Producto</th><th>Categoría</th><th>Precio</th><th>Disponible</th><th>Inventario</th></tr>
+      ${filas((db.menu || []).map(m => `<tr>
+        <td>${m.emoji} ${esc(m.name)}</td>
+        <td>${esc(m.category)}</td>
+        <td>${price(m.price)}</td>
+        <td><span class="chip ${m.available ? 'pagado' : 'cancelado'}">${m.available ? 'Sí' : 'No'}</span></td>
+        <td>${m.trackStock ? (Number(m.stock) > 0 ? Number(m.stock) + ' uds.' : '<span class="chip cancelado">Agotado</span>') : '<span class="muted">Ilimitado</span>'}</td>
+      </tr>`), 5, 'Sin productos')}
+    </table></div>
+
+    <div class="section-title">👥 Usuarios</div>
+    <div class="card" style="overflow-x:auto"><table class="data">
+      <tr><th>Nombre</th><th>Usuario</th><th>Rol</th><th>Activo</th></tr>
+      ${filas((db.users || []).map(u => `<tr>
+        <td>${esc(u.name)}</td><td>${esc(u.username)}</td><td>${esc(ROLE_LABEL[u.role] || u.role)}</td>
+        <td><span class="chip ${u.active ? 'pagado' : 'cancelado'}">${u.active ? 'Sí' : 'No'}</span></td>
+      </tr>`), 4, 'Sin usuarios')}
+    </table></div>
+
+    <div class="section-title">🪑 Mesas</div>
+    <div class="card" style="overflow-x:auto"><table class="data">
+      <tr><th>Mesa</th><th>Asientos</th><th>Estado</th></tr>
+      ${filas((db.tables || []).map(t => `<tr>
+        <td>${t.number}</td><td>${t.seats}</td><td><span class="chip ${t.status}">${t.status === 'libre' ? 'Libre' : 'Ocupada'}</span></td>
+      </tr>`), 3, 'Sin mesas')}
+    </table></div>`;
 }
 
 /* ---------------- AVISOS POR WHATSAPP DEL NEGOCIO ---------------- */
@@ -2111,6 +2182,20 @@ async function act(action, el, ev) {
 
     /* ---- cobro ---- */
     /* (el cobro se maneja en la sección de pago, arriba) */
+
+    /* ---- base de datos (solo dueño) ---- */
+    case 'db-download': {
+      if (!S._dbSnapshot) return toast('Abre la base de datos primero', 'err');
+      const blob = new Blob([JSON.stringify(S._dbSnapshot, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `fritik-base-${fechaIsoLocal()}.json`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      toast('Base de datos descargada ⬇️');
+      break;
+    }
 
     /* ---- personal ---- */
     case 'user-new': userModal(); break;

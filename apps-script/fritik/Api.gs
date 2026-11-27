@@ -817,6 +817,36 @@ apiRoute_('PATCH', '/api/users/:id', [auth, requireRole('dueno'), function (req,
   res.json(safe);
 }]);
 
+/* ---------------- Base de datos (solo dueño, solo lectura) ---------------- */
+// Excluye contraseñas y tokens de sesión: solo se expone lo que el dueño
+// necesita revisar de su propio negocio.
+apiRoute_('GET', '/api/admin/db', [requireRole('dueno'), function (req, res) {
+  var db = D();
+  var users = (db.users || []).map(function (u) {
+    var safe = {};
+    for (var k in u) if (k !== 'password') safe[k] = u[k];
+    return safe;
+  });
+  var orders = (db.orders || []).slice().sort(function (a, b) {
+    return b.createdAt - a.createdAt;
+  }).map(function (o) {
+    var out = {};
+    for (var k in o) out[k] = o[k];
+    out.total = totalOf(o);
+    return out;
+  });
+  res.json({
+    version: db.version,
+    createdAt: db.createdAt,
+    counters: db.counters || {},
+    users: users,
+    menu: db.menu || [],
+    tables: db.tables || [],
+    orders: orders,
+    notifications: db.notifications || [],
+  });
+}]);
+
 /* ---------------- Reportes ---------------- */
 apiRoute_('GET', '/api/reports/summary', [auth, soloReportes, function (req, res) {
   var db = D();
