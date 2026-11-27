@@ -60,6 +60,18 @@ El bloqueo también se aplica en el servidor: aunque un cliente tenga la carta
 cargada, no puede enviar pedidos ni llamados mientras el local esté cerrado. El
 personal sí puede seguir registrando pedidos.
 
+## Numeración de pedidos
+
+El número que se muestra es **diario**: el primer pedido del día es `#001`, el
+siguiente `#002`, y al día siguiente vuelve a empezar en `#001`. Se ve igual en
+Pedidos, Preparación, Cobrados, mesas, tickets, avisos y WhatsApp.
+
+El `id` interno sigue siendo único y nunca se reinicia: así los pedidos
+anteriores no se mezclan ni se rompen las rutas de cobro, borrado o conexión.
+En la vista «🗓️ Todos» se añade la fecha para distinguir pedidos con el mismo
+número de días distintos. Los pedidos anteriores al cambio se numeraron
+automáticamente por día (`001…N`) sin borrar ni modificar su historial.
+
 ## Accesos demo (contraseña `1234`)
 
 | Usuario     | Perfil visible |

@@ -137,9 +137,22 @@ function waClean_(value) {
     .trim();
 }
 
+// Número visible del pedido: 001, 002… y vuelve a 001 cada día.
+// El id interno (db.counters.order) sigue siendo único para las rutas.
+function siguienteNumeroPedido_(db, cuando) {
+  var dia = diaLocalFritik_(cuando || new Date());
+  db.counters = db.counters || {};
+  if (!db.counters.daily || db.counters.daily.date !== dia) {
+    db.counters.daily = { date: dia, value: 1 };
+  }
+  var n = Number(db.counters.daily.value) || 1;
+  db.counters.daily.value = n + 1;
+  return n;
+}
+
 function waTextPedido_(order) {
   var lineas = [];
-  lineas.push('🍭 *FRITIK — NUEVO PEDIDO #' + order.id + '*');
+  lineas.push('🍭 *FRITIK — NUEVO PEDIDO #' + numeroPedidoTexto_(order.numero || order.id) + '*');
   lineas.push(order.orderType === 'llevar' ? '🛍️ Para llevar' : '🪑 Mesa ' + order.tableNumber);
   if (order.customerName) lineas.push('👤 ' + order.customerName);
   lineas.push('📱 ' + (order.customerPhone || 'sin teléfono'));
@@ -537,8 +550,10 @@ apiRoute_('POST', '/api/orders', [auth, function (req, res) {
     }
   }
 
+  var ahora = Date.now();
   var order = {
     id: db.counters.order++,
+    numero: siguienteNumeroPedido_(db, new Date(ahora)),
     tableId: table ? table.id : null,
     tableNumber: table ? table.number : null,
     orderType: orderType,
@@ -549,8 +564,8 @@ apiRoute_('POST', '/api/orders', [auth, function (req, res) {
     status: 'nuevo',
     createdBy: req.user.name,
     createdById: req.user.id,
-    createdAt: Date.now(),
-    history: [{ status: 'nuevo', at: Date.now(), by: req.user.name }],
+    createdAt: ahora,
+    history: [{ status: 'nuevo', at: ahora, by: req.user.name }],
     payments: [],
   };
   db.orders.push(order);

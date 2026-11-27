@@ -19,6 +19,16 @@ var _dirty = false;
 
 var ROLE_RANK = { cliente: 1, mesero: 2, cocinero: 2, cajero: 3, encargado: 4, dueno: 5 };
 
+// Día local del negocio (Venezuela). La numeración de pedidos se reinicia
+// cada día: el primero muestra 001, el siguiente 002, etc.
+function diaLocalFritik_(fecha) {
+  return Utilities.formatDate(new Date(fecha), 'America/Caracas', 'yyyy-MM-dd');
+}
+
+function numeroPedidoTexto_(n) {
+  return String(Number(n) || 0).padStart(3, '0');
+}
+
 // Carta de Fritik: [categoria, nombre, precio (USD), emoji, descripcion]
 var MENUS = [
   // La especialidad de la casa: churros recién hechos.
@@ -103,7 +113,7 @@ function seed() {
     notifications: [],
     sessions: {},
     settings: { closed: false },
-    counters: { order: 1 },
+    counters: { order: 1, daily: { date: diaLocalFritik_(new Date()), value: 1 } },
     createdAt: now,
   };
 }
@@ -173,6 +183,36 @@ function loadDb_() {
   db.counters = db.counters || { order: 1 };
   if (!db.settings) { db.settings = { closed: false }; _dirty = true; }
   if (db.settings.closed == null) { db.settings.closed = false; _dirty = true; }
+
+  // Migración de numeración diaria: los pedidos anteriores reciben 001…N
+  // según el día en que se hicieron, sin alterar su id interno.
+  var porDia = {};
+  (db.orders || []).slice().sort(function (a, b) {
+    return (a.createdAt || 0) - (b.createdAt || 0);
+  }).forEach(function (o) {
+    var dia = diaLocalFritik_(new Date(o.createdAt || Date.now()));
+    if (o.numero != null) {
+      porDia[dia] = Math.max(porDia[dia] || 0, Number(o.numero) || 0);
+      return;
+    }
+    var n = (porDia[dia] || 0) + 1;
+    porDia[dia] = n;
+    o.numero = n;
+    _dirty = true;
+  });
+  var hoy = diaLocalFritik_(new Date());
+  if (!db.counters.daily || db.counters.daily.date !== hoy) {
+    db.counters.daily = { date: hoy, value: (porDia[hoy] || 0) + 1 };
+    _dirty = true;
+  } else if (!porDia[hoy]) {
+    // Día sin pedidos (por ejemplo tras borrar una prueba): volver a 001.
+    if (Number(db.counters.daily.value) !== 1) { db.counters.daily.value = 1; _dirty = true; }
+  } else if (Number(db.counters.daily.value) <= porDia[hoy]) {
+    // Nunca repetir un número ya usado hoy.
+    db.counters.daily.value = porDia[hoy] + 1;
+    _dirty = true;
+  }
+
   if (!db.version || db.version < DB_VERSION) {
     db.menu = carta();
     db.version = DB_VERSION;

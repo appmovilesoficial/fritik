@@ -55,6 +55,15 @@ const destino = o => (o.orderType === 'llevar'
   ? `🛍️ Para llevar${o.customerName ? ' · ' + esc(o.customerName) : ''}`
   : `🪑 Mesa ${o.tableNumber}`);
 
+// Número visible: se reinicia cada día (001, 002…). El id interno sigue único.
+function numPedido(o) {
+  if (o && typeof o === 'object') {
+    return String(Number(o.numero) || Number(o.id) || 0).padStart(3, '0');
+  }
+  const found = (S._ordersCache || []).find(x => x.id === Number(o));
+  return found ? numPedido(found) : String(Number(o) || 0).padStart(3, '0');
+}
+
 function ago(ts) {
   const m = Math.floor((Date.now() - ts) / 60000);
   if (m < 1) return 'ahora';
@@ -77,7 +86,7 @@ function waResumen(o) {
   const lineas = (o.items || []).map(i => `• ${i.qty}× ${i.name} — ${money(i.price * i.qty)}`);
   return [
     '🍭 *Fritik — puro antojo*',
-    `Pedido *#${o.id}*${o.orderType === 'llevar' ? ' · 🛍️ Para llevar' : ' · 🪑 Mesa ' + o.tableNumber}`,
+    `Pedido *#${numPedido(o)}*${o.orderType === 'llevar' ? ' · 🛍️ Para llevar' : ' · 🪑 Mesa ' + o.tableNumber}`,
     o.customerName ? `Cliente: ${o.customerName}` : null,
     '',
     ...lineas,
@@ -151,7 +160,7 @@ function ordenTicketPng(o) {
 
   ctx.fillStyle = '#462611';
   ctx.font = '800 34px "Baloo 2", "Nunito", sans-serif';
-  ctx.fillText('Pedido #' + o.id, 48, 140);
+  ctx.fillText('Pedido #' + numPedido(o), 48, 140);
 
   const cuando = new Date(o.createdAt).toLocaleString('es-VE', {
     weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric',
@@ -226,9 +235,9 @@ function waModal(o) {
   } catch (e) { puedeCompartir = false; }
 
   openModal(`
-    <h2>📲 Avisar por WhatsApp — Pedido #${o.id}</h2>
+    <h2>📲 Avisar por WhatsApp — Pedido #${numPedido(o)}</h2>
     <p class="muted">${esc(o.customerName || 'Cliente')} · 📱 ${esc(o.customerPhone || '')} · ${destino(o)}</p>
-    <img class="wa-ticket" src="${png}" alt="Ticket del pedido #${o.id}"/>
+    <img class="wa-ticket" src="${png}" alt="Ticket del pedido #${numPedido(o)}"/>
     <p class="muted" style="font-size:12px;line-height:1.45">En el celular, <strong>Compartir imagen</strong> abre WhatsApp con
     la imagen lista para enviar. En computadora, descarga la imagen y adjúntala en el chat.
     <strong>Abrir WhatsApp</strong> lleva el resumen escrito del pedido.</p>
@@ -589,14 +598,14 @@ function checkAlerts(role, orders, notifs) {
   if (nuevos.length) {
     const lugares = uniq(nuevos.map(lugar));
     avisos.push(['pedido',
-      nuevos.length === 1 ? `Nuevo pedido #${nuevos[0].id}` : `${nuevos.length} pedidos nuevos`,
+      nuevos.length === 1 ? `Nuevo pedido #${numPedido(nuevos[0])}` : `${nuevos.length} pedidos nuevos`,
       `${recorte(lugares, 3)} · ${money(nuevos.reduce((s, o) => s + (o.total || 0), 0))}`,
       tabSeguro('pedidos')]);
   }
   if (listos.length) {
     const lugares = uniq(listos.map(lugar));
     avisos.push(['listo',
-      listos.length === 1 ? `Pedido #${listos[0].id} listo` : `${listos.length} pedidos listos`,
+      listos.length === 1 ? `Pedido #${numPedido(listos[0])} listo` : `${listos.length} pedidos listos`,
       'Para servir: ' + recorte(lugares, 3),
       tabSeguro('pedidos')]);
   }
@@ -615,7 +624,7 @@ function checkAlerts(role, orders, notifs) {
       tabSeguro('llamados')]);
   }
   mios.forEach(o => avisos.push(['listo',
-    `Tu pedido #${o.id} está listo 🍭`,
+    `Tu pedido #${numPedido(o)} está listo 🍭`,
     o.orderType === 'llevar' ? 'Pasa por el mostrador' : `Servido en la mesa ${o.tableNumber}`,
     tabSeguro('pedido')]));
   if (enCola.length) {
@@ -994,7 +1003,7 @@ function clientePedido(orders) {
   const cancelados = visibles.filter(o => o.status === 'cancelado');
   const card = o => `<div class="card" style="margin-bottom:12px">
     <div class="row">
-      <strong>Pedido #${o.id}</strong> ${chip(o.status)}
+      <strong>Pedido #${numPedido(o)}</strong> ${chip(o.status)}
       ${o.orderType === 'llevar' ? '<span class="chip llevar">🛍️ Para llevar</span>' : '<span class="chip sitio">🍬 En el local</span>'}
       <span class="spacer"></span>
       <span class="muted">${ago(o.createdAt)}</span>
@@ -1204,7 +1213,7 @@ function tableModal(tableId, tables, orders) {
     <p class="muted">Asientos: ${t.seats} · Pendiente: <strong style="color:var(--accent-2)">${price(total)}</strong></p>
     <div style="margin-top:12px">
       ${act.map(o => `<div class="ticket">
-        <div class="head"><span>Pedido #${o.id} · ${esc(o.createdBy)}</span>${chip(o.status)}</div>
+        <div class="head"><span>Pedido #${numPedido(o)} · ${esc(o.createdBy)}</span>${chip(o.status)}</div>
         ${o.customerPhone ? `<div class="notes">📱 ${esc(o.customerPhone)}${o.customerName ? ' · ' + esc(o.customerName) : ''}</div>` : ''}
         <ul>${o.items.map((i, ix) => `<li><span class="q">${i.qty}×</span> ${i.emoji} ${esc(i.name)}${['encargado', 'dueno'].includes(S.user.role) && !['pagado', 'cancelado'].includes(o.status) && o.items.length > 1 ? ` <button class="btn mini ghost" data-action="remove-item" data-id="${o.id}" data-idx="${ix}" data-name="${esc(i.name)}" data-qty="${i.qty}" title="Quitar ${esc(i.name)}">✕</button>` : ''}</li>`).join('')}</ul>
         <div class="actions">
@@ -1249,8 +1258,8 @@ function pedidosView(orders, withServe) {
   return controles + `<div class="grid cols-2">
     ${lista.map(o => `<div class="card">
       <div class="row">
-        <strong>#${o.id} · ${destino(o)}</strong> ${chip(o.status)}
-        <span class="spacer"></span><span class="muted">${ago(o.createdAt)}</span>
+        <strong>#${numPedido(o)} · ${destino(o)}</strong> ${chip(o.status)}
+        <span class="spacer"></span><span class="muted">${todos ? fechaIsoLocal(new Date(o.createdAt)) + ' · ' : ''}${ago(o.createdAt)}</span>
       </div>
       <div class="muted" style="margin-top:4px">Por ${esc(o.createdBy)}${o.customerPhone ? ` · 📱 ${esc(o.customerPhone)}` : ''}</div>
       <div style="margin-top:10px">
@@ -1275,7 +1284,7 @@ function pedidosView(orders, withServe) {
 
 function deleteOrderModal(orderId) {
   openModal(`
-    <h2>🗑️ Eliminar pedido #${orderId}</h2>
+    <h2>🗑️ Eliminar pedido #${numPedido(orderId)}</h2>
     <p class="muted">Se borrará el pedido del sistema y la mesa quedará libre si no tiene otros
     pedidos abiertos. Esta acción no se puede deshacer.</p>
     <div class="actions">
@@ -1299,7 +1308,7 @@ function cocineroView(data) {
       return `<div class="kanban-col">
         <h3>${title} <span class="count">${list.length}</span></h3>
         ${list.map(o => `<div class="ticket">
-          <div class="head"><span>#${o.id} · ${destino(o)}</span><span>${ago(o.createdAt)}</span></div>
+          <div class="head"><span>#${numPedido(o)} · ${destino(o)}</span><span>${ago(o.createdAt)}</span></div>
           ${o.customerPhone ? `<div class="notes">📱 ${esc(o.customerPhone)}${o.customerName ? ' · ' + esc(o.customerName) : ''}</div>` : ''}
           <ul>
             ${o.items.map(i => `<li><span class="q">${i.qty}×</span> <span>${i.emoji} ${esc(i.name)}</span></li>
@@ -1329,7 +1338,7 @@ function cajeroView(tab, data) {
     return `<div class="section-title">✅ Cobrados hoy <span class="chip pagado">${price(todayTotal)}</span></div>
     ${today.length ? `<div class="card"><table class="data">        <tr><th>#</th><th>Mesa</th><th>Método</th><th>Hora</th><th>Total</th><th></th></tr>
       ${today.map(o => `<tr>
-        <td>${o.id}</td><td>${o.orderType === 'llevar' ? 'Llevar' : o.tableNumber}</td>
+        <td title="ID interno ${o.id}">#${numPedido(o)}</td><td>${o.orderType === 'llevar' ? 'Llevar' : o.tableNumber}</td>
         <td>${o.payments.map(p => p.method + (p.reference ? ' · Ref. ' + esc(p.reference) : '')).join(', ')}</td>
         <td>${new Date(o.payments[o.payments.length - 1].at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</td>
         <td><strong>${price(o.total)}</strong></td>
@@ -1343,7 +1352,7 @@ function cajeroView(tab, data) {
   return `<div class="section-title">💰 Por cobrar <span class="muted">${porCobrar.length} pedido(s)</span></div>
   ${porCobrar.length ? `<div class="grid cols-2">
     ${porCobrar.map(o => `<div class="card">
-      <div class="row"><strong>#${o.id} · ${destino(o)}</strong> ${chip(o.status)}
+      <div class="row"><strong>#${numPedido(o)} · ${destino(o)}</strong> ${chip(o.status)}
         <span class="spacer"></span><span class="muted">${ago(o.createdAt)}</span></div>
       <div style="margin-top:8px">
         ${o.items.map(i => `<div class="cart-line"><span>${i.qty}× ${esc(i.name)}</span><span>${price(i.price * i.qty)}</span></div>`).join('')}
@@ -1366,7 +1375,7 @@ function payModal(orderId) {
   const o = S._ordersCache && S._ordersCache.find(x => x.id === Number(orderId));
   if (!o) return;
   openModal(`
-    <h2>💵 Cobrar pedido #${o.id} — ${destino(o)}</h2>
+    <h2>💵 Cobrar pedido #${numPedido(o)} — ${destino(o)}</h2>
     <div class="cart-line"><span>Subtotal (productos)</span><strong>${price(o.total)}</strong></div>
     <div class="cart-total"><span>Total a pagar</span><span>${price(o.total)}</span></div>
     <div class="field" style="margin-top:16px">
@@ -1523,7 +1532,7 @@ function dbView(db) {
     <div class="card" style="overflow-x:auto"><table class="data">
       <tr><th>#</th><th>Fecha</th><th>Destino</th><th>Estado</th><th>Cliente</th><th>Productos</th><th>Total</th><th>Cobro</th></tr>
       ${filas((db.orders || []).map(o => `<tr>
-        <td>#${o.id}</td>
+        <td title="ID interno ${o.id}">#${numPedido(o)}</td>
         <td>${fecha(o.createdAt)}</td>
         <td>${destino(o)}</td>
         <td>${chip(o.status)}</td>
@@ -1993,7 +2002,7 @@ async function act(action, el, ev) {
       S.cart = [];
       closeModal();
       S.tab = 'pedido';
-      toast(`¡Pedido #${data.id} enviado a preparación! 🍭`);
+      toast(`¡Pedido #${numPedido(data)} enviado a preparación! 🍭`);
       render();
       break;
     }
@@ -2064,7 +2073,7 @@ async function act(action, el, ev) {
         if (!navigator.canShare || !navigator.canShare({ files: [file] })) {
           return toast('Este navegador no permite compartir imágenes', 'err');
         }
-        await navigator.share({ files: [file], title: 'Fritik — pedido #' + o.id, text: waResumen(o) });
+        await navigator.share({ files: [file], title: 'Fritik — pedido #' + numPedido(o), text: waResumen(o) });
       } catch (e) {
         if (e && e.name !== 'AbortError') toast('No se pudo compartir la imagen', 'err');
       }
@@ -2075,7 +2084,7 @@ async function act(action, el, ev) {
       const oid = Number(id);
       const idx = Number(el.dataset.idx);
       const nombre = `${el.dataset.qty}× ${el.dataset.name}`;
-      if (!confirm(`¿Quitar ${nombre} del pedido #${oid}?`)) return;
+      if (!confirm(`¿Quitar ${nombre} del pedido #${numPedido(oid)}?`)) return;
       await api(`/orders/${oid}/items/${idx}`, { method: 'DELETE' });
       closeModal();
       toast('Producto quitado ✔');
@@ -2315,7 +2324,7 @@ async function act(action, el, ev) {
 async function addItemsModal(orderId) {
   const menu = await api('/menu');
   openModal(`
-    <h2>➕ Agregar productos al pedido #${orderId}</h2>
+    <h2>➕ Agregar productos al pedido #${numPedido(orderId)}</h2>
     <div class="field"><label>Producto</label>
       <select id="ai-menu">${menu.filter(m => m.available && !(m.trackStock && Number(m.stock) <= 0)).map(m =>
         `<option value="${m.id}">${m.emoji} ${esc(m.name)} — ${money(m.price)}${m.trackStock ? ' · quedan ' + Number(m.stock) : ''}</option>`).join('')}</select></div>
