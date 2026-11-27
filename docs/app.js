@@ -903,9 +903,16 @@ function syncCart() {
 async function buildCliente(seq) {
   // El menú y los pedidos se piden siempre: los pedidos permiten avisar
   // al cliente cuando su pedido está listo, aunque esté en otra pestaña.
-  const [menu, orders] = await Promise.all([api('/menu'), api('/orders')]);
+  const [menu, orders, status] = await Promise.all([
+    api('/menu'),
+    api('/orders'),
+    api('/settings/closed').catch(() => ({ closed: false })),
+  ]);
   if (seq !== S.renderSeq) return '';
   S.menu = menu;
+  if (status && status.closed) {
+    return `<div class="shell">${topbar()}${cerradoView()}</div>`;
+  }
   checkAlerts('cliente', orders, null);
 
   if (!S.table && S.tab === 'mesa') S.tab = 'menu';
@@ -921,6 +928,22 @@ async function buildCliente(seq) {
       `<button class="${S.tab === id ? 'active' : ''}" data-action="tab" data-tab="${id}">${label}</button>`).join('')}</div>
     ${body}
     <div id="cart-fab-slot">${cartFab()}</div>
+  </div>`;
+}
+
+function cerradoView() {
+  return `<div class="cerrado-screen">
+    <div class="card cerrado-card">
+      <img src="assets/cerrado.svg?v=1" alt="Fritik — estamos cerrados, volveremos pronto"/>
+      <div class="cerrado-msg">
+        <h1>Estamos cerrados</h1>
+        <p>Volveremos pronto con churros recién hechos y puro antojo.</p>
+        <span class="chip cancelado">🔒 El menú estará disponible cuando abramos</span>
+        <div style="margin-top:16px">
+          <button class="btn small secondary" data-action="recheck-closed">🔄 Actualizar</button>
+        </div>
+      </div>
+    </div>
   </div>`;
 }
 
@@ -1108,10 +1131,11 @@ async function buildStaff(seq) {
   const needMenu = isAdmin && tab === 'menu';
   const needWa = isAdmin && tab === 'avisos';
   const needDb = role === 'dueno' && tab === 'db';
+  const needClosed = isAdmin && tab === 'menu';
   const needSummary = (role === 'encargado' && ['resumen', 'reportes'].includes(tab))
     || (role === 'dueno' && ['dashboard', 'reportes'].includes(tab));
 
-  const [tables, orders, notifs, menu, summary, wa, db] = await Promise.all([
+  const [tables, orders, notifs, menu, summary, wa, db, closed] = await Promise.all([
     needTables ? api('/tables') : null,
     api('/orders'),
     needNotifs ? api('/notifications') : null,
@@ -1119,6 +1143,7 @@ async function buildStaff(seq) {
     needSummary ? api('/reports/summary') : null,
     needWa ? api('/settings/wa').catch(() => null) : null,
     needDb ? api('/admin/db').catch(() => null) : null,
+    needClosed ? api('/settings/closed').catch(() => null) : null,
   ]);
   if (seq !== S.renderSeq) return '';
 
@@ -1129,6 +1154,7 @@ async function buildStaff(seq) {
   if (notifs) data.notifs = notifs;
   if (wa) data.wa = wa;
   if (db) data.db = db;
+  if (closed) data.closed = closed;
   S.notifCount = notifs ? notifs.length : 0;
   S._ordersCache = orders;   // para pagos, WhatsApp y tickets
   checkAlerts(role, orders, notifs);
@@ -1396,7 +1422,7 @@ function encargadoView(tab, data) {
   if (tab === 'pedidos') return pedidosView(data.orders, true);
   if (tab === 'cocina') return cocineroView(data);
   if (tab === 'cobrar' || tab === 'cobrados') return cajeroView(tab, data);
-  if (tab === 'menu') return menuAdminView(data.menu, false);
+  if (tab === 'menu') return menuAdminView(data.menu, false, data.closed);
   if (tab === 'mesas') return mesasQrView(data.tables, data.orders);
   if (tab === 'llamados') return llamadosView(data.notifs);
   if (tab === 'avisos') return avisosView(data.wa);
@@ -1463,7 +1489,7 @@ async function duenoView(tab, data) {
     return reportesView(r);
   }
   if (tab === 'pedidos') return pedidosView(data.orders, false);
-  if (tab === 'menu') return menuAdminView(data.menu, true);
+  if (tab === 'menu') return menuAdminView(data.menu, true, data.closed);
   if (tab === 'mesas') return mesasQrView(data.tables, data.orders);
   if (tab === 'personal') return personalView(await api('/users'));
   if (tab === 'db') return dbView(data.db || await api('/admin/db'));
@@ -1594,10 +1620,23 @@ function avisosView(wa) {
 }
 
 /* ---------------- MENÚ (admin) ---------------- */
-function menuAdminView(menu, canDelete) {
+function menuAdminView(menu, canDelete, closed) {
   const cats = [...new Set(menu.map(m => m.category))];
+  const abierto = !(closed && closed.closed);
   return `<div class="section-title">📖 Menú
     <button class="btn small" data-action="menu-new">➕ Nuevo producto</button></div>
+  <div class="card row" style="align-items:center;gap:12px;margin-bottom:14px">
+    <div>
+      <strong>${abierto ? '🟢 Local abierto' : '🔴 Local cerrado'}</strong>
+      <div class="muted">${abierto
+        ? 'Los clientes pueden ver la carta y pedir con el QR.'
+        : 'Al escanear el QR verán “Estamos cerrados · Volveremos pronto”. El personal sí puede seguir registrando pedidos.'}</div>
+    </div>
+    <span class="spacer"></span>
+    <button class="btn small ${abierto ? 'red' : 'green'}" data-action="toggle-closed" data-closed="${abierto ? '1' : '0'}">
+      ${abierto ? '🔒 Cerrar menú al público' : '🔓 Abrir menú al público'}
+    </button>
+  </div>
   ${cats.map(c => `<div class="section-title" style="font-size:16px">${esc(c)}</div>
     <div class="card"><table class="data">
       <tr><th></th><th>Producto</th><th>Precio</th><th>Disponible</th><th>Inventario</th><th></th></tr>
@@ -2136,6 +2175,16 @@ async function act(action, el, ev) {
       a.click();
       break;
     }
+
+    /* ---- apertura del local ---- */
+    case 'toggle-closed': {
+      const cerrar = el.dataset.closed === '1';
+      await api('/settings/closed', { method: 'PATCH', body: { closed: cerrar } });
+      toast(cerrar ? '🔒 Menú cerrado al público' : '🔓 Menú abierto al público');
+      render();
+      break;
+    }
+    case 'recheck-closed': render(); break;
 
     /* ---- menú admin ---- */
     case 'menu-new': menuModal(null); break;

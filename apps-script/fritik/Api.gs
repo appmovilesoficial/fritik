@@ -189,6 +189,22 @@ function autorizarAvisos() {
 }
 
 /* ---------------- Ajustes del negocio ---------------- */
+// El cierre solo afecta a los clientes: el personal puede seguir registrando
+// pedidos. El frontend muestra la imagen de "estamos cerrados" al escanear el QR.
+apiRoute_('GET', '/api/settings/closed', [auth, function (req, res) {
+  var db = D();
+  res.json({ closed: !!(db.settings && db.settings.closed) });
+}]);
+
+apiRoute_('PATCH', '/api/settings/closed', [minRank(4), function (req, res) {
+  var db = D();
+  var b = req.body || {};
+  db.settings = db.settings || {};
+  db.settings.closed = !!b.closed;
+  save();
+  res.json({ ok: true, closed: db.settings.closed });
+}]);
+
 apiRoute_('GET', '/api/settings/wa', [minRank(4), function (req, res) {
   var cfg = waConfig_();
   var last = null;
@@ -475,6 +491,9 @@ apiRoute_('POST', '/api/orders', [auth, function (req, res) {
   if (['cliente', 'mesero', 'encargado', 'dueno'].indexOf(req.user.role) === -1) {
     return res.status(403).json({ error: 'No tienes permisos para crear pedidos' });
   }
+  if (req.user.role === 'cliente' && db.settings && db.settings.closed) {
+    return res.status(400).json({ error: 'Estamos cerrados. Volveremos pronto.' });
+  }
   if (!Array.isArray(b.items) || !b.items.length) return res.status(400).json({ error: 'El pedido está vacío' });
 
   var table = b.tableId ? db.tables.filter(function (t) { return t.id === b.tableId; })[0] : null;
@@ -747,6 +766,9 @@ apiRoute_('GET', '/api/notifications', [auth, function (req, res) {
 
 apiRoute_('POST', '/api/notifications', [auth, function (req, res) {
   var b = req.body || {};
+  if (req.user.role === 'cliente' && D().settings && D().settings.closed) {
+    return res.status(400).json({ error: 'Estamos cerrados. Volveremos pronto.' });
+  }
   if (req.user.role === 'cliente' && !req.user.tableId) {
     return res.status(400).json({ error: 'Los pedidos para llevar no usan llamados: pasa por caja' });
   }
@@ -839,6 +861,7 @@ apiRoute_('GET', '/api/admin/db', [requireRole('dueno'), function (req, res) {
     version: db.version,
     createdAt: db.createdAt,
     counters: db.counters || {},
+    settings: db.settings || { closed: false },
     users: users,
     menu: db.menu || [],
     tables: db.tables || [],

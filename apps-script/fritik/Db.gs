@@ -102,6 +102,7 @@ function seed() {
     orders: [],
     notifications: [],
     sessions: {},
+    settings: { closed: false },
     counters: { order: 1 },
     createdAt: now,
   };
@@ -170,6 +171,8 @@ function loadDb_() {
   db.notifications = db.notifications || [];
   db.sessions = db.sessions || {};
   db.counters = db.counters || { order: 1 };
+  if (!db.settings) { db.settings = { closed: false }; _dirty = true; }
+  if (db.settings.closed == null) { db.settings.closed = false; _dirty = true; }
   if (!db.version || db.version < DB_VERSION) {
     db.menu = carta();
     db.version = DB_VERSION;

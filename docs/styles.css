@@ -132,6 +132,17 @@ label { font-size: 13px; color: var(--muted); display: block; margin-bottom: 6px
   box-shadow: var(--shadow);
 }
 
+/* ---------- Local cerrado ---------- */
+.cerrado-screen { display: grid; place-items: center; padding: 18px 12px 50px; }
+.cerrado-card { max-width: 620px; width: 100%; overflow: hidden; }
+.cerrado-card img { display: block; width: 100%; height: auto; }
+.cerrado-msg { padding: 18px 20px 24px; text-align: center; }
+.cerrado-msg h1 {
+  margin: 0 0 8px; font-family: 'Baloo 2', Georgia, serif;
+  font-size: 30px; color: var(--text);
+}
+.cerrado-msg p { margin: 0 0 14px; color: var(--muted); font-size: 15px; line-height: 1.5; }
+
 /* ---------- Especialidad: churros ---------- */
 .specialty-strip {
   text-align: center;

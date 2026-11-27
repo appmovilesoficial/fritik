@@ -49,6 +49,17 @@ con su inventario, los usuarios y las mesas. El botón **⬇️ Descargar JSON**
 guarda una copia legible. Por seguridad no se muestran contraseñas ni tokens
 de sesión, y el endpoint `/api/admin/db` solo responde para el rol `dueno`.
 
+## Abrir y cerrar el local
+
+En **📖 Menú** (dueño o encargado) hay un botón **🔒 Cerrar menú al público**.
+Al activarlo, quien escanee el QR de una mesa o abra la carta pública verá la
+imagen «Estamos cerrados · Volveremos pronto» y no podrá pedir. El botón pasa a
+**🔓 Abrir menú al público** para reactivar la carta.
+
+El bloqueo también se aplica en el servidor: aunque un cliente tenga la carta
+cargada, no puede enviar pedidos ni llamados mientras el local esté cerrado. El
+personal sí puede seguir registrando pedidos.
+
 ## Accesos demo (contraseña `1234`)
 
 | Usuario     | Perfil visible |

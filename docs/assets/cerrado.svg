@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 700" width="1200" height="700" role="img" aria-label="Fritik — estamos cerrados, volveremos pronto">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f7d76b"/>
+      <stop offset=".55" stop-color="#dfb51d"/>
+      <stop offset="1" stop-color="#f4c94b"/>
+    </linearGradient>
+    <linearGradient id="churro" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e3a751"/>
+      <stop offset=".5" stop-color="#cf8a32"/>
+      <stop offset="1" stop-color="#b06d1f"/>
+    </linearGradient>
+    <g id="churro-piece">
+      <rect x="-150" y="-20" width="300" height="40" rx="20" fill="url(#churro)" stroke="#8f5417" stroke-width="4"/>
+      <g stroke="#9c5f1d" stroke-width="5" stroke-linecap="round" opacity=".8">
+        <line x1="-120" y1="-12" x2="-120" y2="12"/>
+        <line x1="-88" y1="-14" x2="-88" y2="14"/>
+        <line x1="-56" y1="-12" x2="-56" y2="12"/>
+        <line x1="-24" y1="-14" x2="-24" y2="14"/>
+        <line x1="8" y1="-12" x2="8" y2="12"/>
+        <line x1="40" y1="-14" x2="40" y2="14"/>
+        <line x1="72" y1="-12" x2="72" y2="12"/>
+        <line x1="104" y1="-14" x2="104" y2="14"/>
+      </g>
+      <g fill="#fffaf0" opacity=".95">
+        <circle cx="-134" cy="-5" r="4"/><circle cx="-102" cy="6" r="5"/>
+        <circle cx="-70" cy="-6" r="4"/><circle cx="-38" cy="5" r="5"/>
+        <circle cx="-6" cy="-6" r="4"/><circle cx="26" cy="5" r="5"/>
+        <circle cx="58" cy="-5" r="4"/><circle cx="90" cy="6" r="5"/>
+        <circle cx="122" cy="-4" r="4"/>
+      </g>
+    </g>
+  </defs>
+
+  <rect width="1200" height="700" fill="url(#bg)"/>
+  <circle cx="90" cy="90" r="56" fill="#fffaf0" opacity=".5"/>
+  <circle cx="1120" cy="620" r="78" fill="#fffaf0" opacity=".4"/>
+  <circle cx="1070" cy="90" r="40" fill="#e84a7a" opacity=".45"/>
+  <circle cx="170" cy="610" r="30" fill="#462611" opacity=".15"/>
+  <g fill="#fffaf0" opacity=".6">
+    <circle cx="330" cy="120" r="9"/><circle cx="370" cy="155" r="6"/>
+    <circle cx="910" cy="580" r="9"/><circle cx="950" cy="615" r="6"/>
+  </g>
+
+  <!-- Churros a la izquierda -->
+  <g transform="translate(215 320)">
+    <use href="#churro-piece" transform="translate(0 -70) rotate(-28)"/>
+    <use href="#churro-piece" transform="translate(-10 10) rotate(-14)"/>
+    <use href="#churro-piece" transform="translate(10 95) rotate(-4)"/>
+  </g>
+
+  <!-- Cartel -->
+  <g transform="translate(640 155)">
+    <rect x="0" y="0" width="480" height="400" rx="34" fill="#fffaf0" stroke="#462611" stroke-width="10"/>
+    <rect x="20" y="20" width="440" height="360" rx="22" fill="none" stroke="#e84a7a" stroke-width="5" stroke-dasharray="14 10"/>
+
+    <!-- candado -->
+    <g transform="translate(240 92)">
+      <path d="M-30 -6 v-22 a30 30 0 0 1 60 0 v22" fill="none" stroke="#462611" stroke-width="13" stroke-linecap="round"/>
+      <rect x="-48" y="-8" width="96" height="76" rx="16" fill="#dfb51d" stroke="#462611" stroke-width="10"/>
+      <circle cx="0" cy="28" r="9" fill="#462611"/>
+      <rect x="-4" y="32" width="8" height="18" rx="4" fill="#462611"/>
+    </g>
+
+    <text x="240" y="222" text-anchor="middle" font-family="Georgia, serif" font-size="76" font-weight="800" fill="#e84a7a" letter-spacing="2">CERRADO</text>
+    <line x1="80" y1="248" x2="400" y2="248" stroke="#dfb51d" stroke-width="6" stroke-linecap="round"/>
+    <text x="240" y="300" text-anchor="middle" font-family="Georgia, serif" font-size="34" font-weight="700" fill="#462611">Estamos cerrados</text>
+    <text x="240" y="348" text-anchor="middle" font-family="Georgia, serif" font-size="30" font-weight="700" fill="#462611">Volveremos pronto</text>
+  </g>
+
+  <!-- Marca -->
+  <text x="880" y="620" text-anchor="middle" font-family="Georgia, serif" font-size="58" font-weight="800" fill="#462611" letter-spacing="2">Fritik</text>
+  <text x="880" y="658" text-anchor="middle" font-family="Georgia, serif" font-size="24" font-weight="700" fill="#e84a7a" letter-spacing="6">puro antojo</text>
+</svg>
