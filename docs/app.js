@@ -1628,6 +1628,35 @@ function avisosView(wa) {
   </div>`;
 }
 
+/* ---------------- TASA BCV (solo dueño/encargado) ---------------- */
+function tasaAdminCard() {
+  const manual = !!(RATE && RATE.manual);
+  const valor = RATE && RATE.tasa
+    ? Number(RATE.tasa).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 4 })
+    : '—';
+  return `<div class="card" style="margin-bottom:14px">
+    <div class="row">
+      <strong>💱 Tasa del dólar (BCV)</strong><span class="spacer"></span>
+      <span class="chip ${manual ? 'pagado' : 'nuevo'}">${manual ? 'Fijada por el dueño' : 'Automática'}</span>
+    </div>
+    <p class="muted" style="margin:6px 0 12px;line-height:1.5">
+      ${RATE && RATE.tasa ? `1 $ = Bs. ${valor}` : 'Cargando tasa…'} ·
+      fecha valor: ${RATE && RATE.fechaValorLegible ? esc(RATE.fechaValorLegible) : '—'}<br/>
+      ${manual
+        ? 'Los precios en Bs. usan esta tasa en todos los dispositivos. Vuelve a automática cuando el BCV ya esté reflejado en la API.'
+        : 'Se toma de la API oficial. Si el BCV publicó otra tasa y aquí no aparece aún, fíjala manualmente.'}
+    </p>
+    <div class="row" style="gap:8px;flex-wrap:wrap;align-items:flex-end">
+      <div class="field" style="margin:0"><label>Tasa (Bs. por 1 $)</label>
+        <input id="rate-tasa" type="number" step="0.0001" min="0" value="${RATE ? RATE.tasa : ''}" style="min-width:170px"/></div>
+      <div class="field" style="margin:0"><label>Fecha valor</label>
+        <input id="rate-fecha" type="date" value="${RATE && RATE.fechaValor ? RATE.fechaValor : ''}" style="min-width:170px"/></div>
+      <button class="btn small" data-action="rate-save">💾 Fijar tasa</button>
+      ${manual ? '<button class="btn small secondary" data-action="rate-auto">↩️ Volver a automática</button>' : ''}
+    </div>
+  </div>`;
+}
+
 /* ---------------- MENÚ (admin) ---------------- */
 function menuAdminView(menu, canDelete, closed) {
   const cats = [...new Set(menu.map(m => m.category))];
@@ -1646,6 +1675,7 @@ function menuAdminView(menu, canDelete, closed) {
       ${abierto ? '🔒 Cerrar menú al público' : '🔓 Abrir menú al público'}
     </button>
   </div>
+  ${tasaAdminCard()}
   ${cats.map(c => `<div class="section-title" style="font-size:16px">${esc(c)}</div>
     <div class="card"><table class="data">
       <tr><th></th><th>Producto</th><th>Precio</th><th>Disponible</th><th>Inventario</th><th></th></tr>
@@ -2195,6 +2225,24 @@ async function act(action, el, ev) {
     }
     case 'recheck-closed': render(); break;
 
+    /* ---- tasa BCV (solo dueño/encargado) ---- */
+    case 'rate-save': {
+      const tasa = Number(document.getElementById('rate-tasa').value);
+      const fechaValor = document.getElementById('rate-fecha').value;
+      await api('/settings/rate', { method: 'PATCH', body: { tasa, fechaValor } });
+      await loadRate(true);
+      toast('Tasa fijada ✔');
+      render();
+      break;
+    }
+    case 'rate-auto': {
+      await api('/settings/rate', { method: 'PATCH', body: { clear: true } });
+      await loadRate(true);
+      toast('Tasa automática restablecida');
+      render();
+      break;
+    }
+
     /* ---- menú admin ---- */
     case 'menu-new': menuModal(null); break;
     case 'menu-edit': {
@@ -2411,7 +2459,7 @@ window.addEventListener('hashchange', () => route().catch(e => toast(e.message, 
 /* ---------------- Tasa oficial del dólar del BCV (consultada desde el navegador) ---------------- */
 // El BCV publica el viernes por la tarde la tasa que rige el lunes. Por eso,
 // desde el viernes 5:00 pm hasta el lunes se factura con esa misma tasa.
-const RATE_CACHE_KEY = 'fritik_rate_v3';
+const RATE_CACHE_KEY = 'fritik_rate_v4';
 const RATE_TTL = 6 * 60 * 60 * 1000;
 const BCV_TZ = 'America/Caracas';
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio',
@@ -2462,10 +2510,11 @@ function periodoBcv(fecha = new Date()) {
   return c.iso;
 }
 
-// La tasa que el BCV publica el viernes ya tiene fecha valor lunes.
+// dolarapi devuelve en fechaActualizacion la fecha valor del BCV. Antes se
+// corría del viernes al lunes y eso etiquetaba la tasa del viernes como si
+// fuera la del lunes (mostraba 926,36 con fecha valor lunes 30/11).
 function fechaValorDe(publicacion) {
-  if (!publicacion) return null;
-  return diaSemanaIso(publicacion) === 5 ? sumarDiasIso(publicacion, 3) : publicacion;
+  return publicacion || null;
 }
 
 async function fetchBcvDolar() {
@@ -2476,23 +2525,55 @@ async function fetchBcvDolar() {
   if (!Number.isFinite(tasa) || tasa <= 0) return null;
   const publicacion = String((dolar && dolar.fechaActualizacion) || '').slice(0, 10) || null;
   const fechaValor = fechaValorDe(publicacion);
-  const esTasaDelLunes = !!publicacion && fechaValor !== publicacion;
   return {
     tasa,
     publicacion,
     fechaValor,
     fechaValorLegible: fechaLegible(fechaValor),
-    regla: esTasaDelLunes ? 'tasa del lunes · aplica viernes a lunes' : 'tasa oficial del BCV',
+    regla: 'tasa oficial del BCV',
     fuente: 'BCV — Banco Central de Venezuela',
+    manual: false,
     actualizado: Date.now(),
   };
+}
+
+function guardarRate(r) {
+  RATE = r;
+  try { localStorage.setItem(RATE_CACHE_KEY, JSON.stringify({ ...r, at: Date.now() })); } catch (e) { /* cache opcional */ }
 }
 
 async function loadRate(force) {
   let cache = null;
   try { cache = JSON.parse(localStorage.getItem(RATE_CACHE_KEY) || 'null'); } catch (e) { cache = null; }
+
+  // 1) El dueño puede fijar la tasa exacta del BCV: manda sobre la API.
+  let override = null;
+  try {
+    const cfg = await api('/settings/rate');
+    override = cfg && cfg.override;
+  } catch (e) { override = null; }
+
+  if (override && Number(override.tasa) > 0 && override.fechaValor) {
+    const tasa = Number(override.tasa);
+    const igual = cache && cache.manual && cache.tasa === tasa
+      && cache.fechaValor === override.fechaValor;
+    if (!force && igual) { RATE = cache; return; }
+    guardarRate({
+      tasa,
+      publicacion: override.fechaValor,
+      fechaValor: override.fechaValor,
+      fechaValorLegible: fechaLegible(override.fechaValor),
+      regla: 'tasa fijada por el dueño',
+      fuente: 'BCV — fijada en el aplicativo',
+      manual: true,
+      actualizado: override.updatedAt || Date.now(),
+    });
+    return;
+  }
+
+  // 2) Sin tasa fijada: se usa la publicación oficial desde dolarapi.
   const esperado = periodoBcv();
-  if (!force && cache && cache.tasa && cache.fechaValor === esperado
+  if (!force && cache && cache.tasa && !cache.manual && cache.fechaValor === esperado
       && Date.now() - (cache.at || 0) < RATE_TTL) {
     RATE = cache;
     return;
@@ -2500,13 +2581,12 @@ async function loadRate(force) {
   try {
     const r = await fetchBcvDolar();
     if (r) {
-      if (r.fechaValor === esperado || !cache || !cache.tasa) {
-        RATE = r;
-        localStorage.setItem(RATE_CACHE_KEY, JSON.stringify({ ...r, at: Date.now() }));
+      if (r.fechaValor === esperado || !cache || !cache.tasa || cache.manual) {
+        guardarRate(r);
         return;
       }
-      // El BCV todavía no publicó la tasa del periodo (p. ej. viernes 17:01):
-      // se mantiene la última tasa válida y se reintenta en el próximo ciclo.
+      // El BCV todavía no publicó la tasa del periodo: se mantiene la última
+      // válida y se reintenta en el próximo ciclo.
       RATE = cache;
       return;
     }

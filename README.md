@@ -116,12 +116,15 @@ Los precios se muestran en dólares (**$**) y su equivalente en bolívares con
 la **tasa oficial del dólar del BCV**, consultada desde
 `ve.dolarapi.com/v1/dolares/oficial`.
 
-El BCV publica el **viernes por la tarde la tasa con fecha valor del lunes**.
-Fritik la aplica desde el **viernes después de las 5:00 pm (hora de
-Venezuela)** y la mantiene el **sábado, domingo y lunes**; el martes cambia a la
-nueva tasa. La barra superior indica `fecha valor: lunes ... · tasa del lunes ·
-aplica viernes a lunes`. Si al entrar el viernes a las 5:01 pm el BCV aún no
-publicó, se conserva la última tasa válida y se reintenta cada 30 minutos.
+La API devuelve la **fecha valor** en `fechaActualizacion` y Fritik la muestra
+tal cual en la barra superior. Antes se corría del viernes al lunes, lo que
+etiquetaba la tasa del viernes (`926,36`) como si fuera la del lunes 30/11; eso
+ya no ocurre. Si el BCV publicó una tasa nueva y la API todavía no la trae, el
+dueño o el encargado pueden fijarla en **📖 Menú → 💱 Tasa del dólar (BCV)**:
+se escriben la tasa exacta (por ejemplo `928.5454`) y su fecha valor
+(`2026-11-30`) y se pulsa **💾 Fijar tasa**. El valor se guarda en la base de
+datos de Fritik y se aplica en todos los dispositivos; **↩️ Volver a automática**
+retoma la API.
 
 ## Inventario por producto
 

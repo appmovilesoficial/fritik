@@ -218,6 +218,37 @@ apiRoute_('PATCH', '/api/settings/closed', [minRank(4), function (req, res) {
   res.json({ ok: true, closed: db.settings.closed });
 }]);
 
+// Tasa BCV fijada por el dueño (opcional). La consultan también los clientes,
+// por eso el GET es público: solo expone un número, nunca datos del negocio.
+apiRoute_('GET', '/api/settings/rate', [function (req, res) {
+  var db = D();
+  res.json({ override: (db.settings && db.settings.rateOverride) || null });
+}]);
+
+apiRoute_('PATCH', '/api/settings/rate', [minRank(4), function (req, res) {
+  var db = D();
+  var b = req.body || {};
+  db.settings = db.settings || {};
+  if (b.clear || b.tasa === null || b.tasa === '') {
+    db.settings.rateOverride = null;
+  } else {
+    var tasa = Number(b.tasa);
+    var fecha = String(b.fechaValor || '').slice(0, 10);
+    if (!isFinite(tasa) || tasa <= 0) {
+      return res.status(400).json({ error: 'Escribe una tasa válida' });
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
+      return res.status(400).json({ error: 'Escribe la fecha valor (YYYY-MM-DD)' });
+    }
+    db.settings.rateOverride = {
+      tasa: tasa, fechaValor: fecha,
+      updatedAt: Date.now(), by: req.user.name,
+    };
+  }
+  save();
+  res.json({ ok: true, override: db.settings.rateOverride });
+}]);
+
 apiRoute_('GET', '/api/settings/wa', [minRank(4), function (req, res) {
   var cfg = waConfig_();
   var last = null;
